@@ -57,7 +57,7 @@ const HTML_PAGE = `
     <div class="container mx-auto px-4 py-8 max-w-4xl">
         <!-- Header -->
         <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-gray-800 mb-2">🔍 Scamalytics IP Checker</h1>
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Scamalytics IP Checker</h1>
             <p class="text-gray-600">Check IP Fraud Risk & Score Analysis</p>
         </div>
 
@@ -67,7 +67,7 @@ const HTML_PAGE = `
                 <input 
                     type="text" 
                     id="ipInput" 
-                    placeholder="Enter IP address (e.g., 8.8.8.8)"
+                    placeholder="Enter IP address (127.0.0.1,...)"
                     class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
                 />
                 <button 
@@ -78,7 +78,7 @@ const HTML_PAGE = `
                 </button>
             </div>
             <p class="text-sm text-gray-500 mt-3">You can also use URL parameter: ?ip=8.8.8.8</p>
-            <p class="text-sm text-blue-600 mt-2">🔗 API Endpoints: <code class="bg-gray-100 px-2 py-1 rounded">/8.8.8.8</code> or <code class="bg-gray-100 px-2 py-1 rounded">/api/8.8.8.8</code></p>
+            <p class="text-sm text-blue-600 mt-2">API Endpoints: <code class="bg-gray-100 px-2 py-1 rounded">/8.8.8.8</code> or <code class="bg-gray-100 px-2 py-1 rounded">/api/8.8.8.8</code></p>
         </div>
 
         <!-- Loading -->
