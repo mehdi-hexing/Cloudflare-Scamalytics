@@ -366,9 +366,19 @@ const HTML_PAGE = `
 </body>
 </html>`;
 
-// Main request handler
+addEventListener('fetch', event => {
+    event.respondWith(handleRequest(event.request));
+});
+export default {
+    async fetch(request, env, ctx) {
+        return handleRequest(request);
+    }
+};
 export async function onRequest(context) {
-    const { request } = context;
+    return handleRequest(context.request);
+}
+
+async function handleRequest(request) {
     const url = new URL(request.url);
     const path = url.pathname;
     
@@ -382,15 +392,21 @@ export async function onRequest(context) {
         // Check if path starts with 'api/'
         if (cleanPath.startsWith('api/')) {
             ip = cleanPath.substring(4); // Remove 'api/' prefix
-        } else if (isValidIP(cleanPath)) {
+        } else {
             // Direct IP in path
             ip = cleanPath;
         }
         
-        // If valid IP found, return API response
+        // Validate if it's an IP
         if (ip && isValidIP(ip)) {
             return handleAPIRequest(ip);
         }
+    }
+    
+    // Check for ?api=IP parameter
+    const apiParam = url.searchParams.get('api');
+    if (apiParam) {
+        return handleAPIRequest(apiParam);
     }
     
     // Default: serve HTML page
@@ -455,27 +471,7 @@ async function handleAPIRequest(ip) {
 async function fetchScamalyticsData(ip) {
     const targetUrl = `https://scamalytics.com/ip/${ip}`;
     
-    // Try direct fetch first (works in Cloudflare Workers/Pages)
-    try {
-        const response = await fetch(targetUrl, {
-            headers: {
-                'User-Agent': getRandomUserAgent(),
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5'
-            }
-        });
-        
-        if (response.ok) {
-            const html = await response.text();
-            if (html.includes('Fraud Score') || html.includes('scamalytics')) {
-                return parseScamalyticsHTML(html, ip);
-            }
-        }
-    } catch (e) {
-        console.log('Direct fetch failed, trying proxies...');
-    }
-    
-    // Fallback to proxies
+    // Enhanced CORS proxies with retry
     const proxies = [
         { 
             name: 'AllOrigins',
@@ -506,65 +502,107 @@ async function fetchScamalyticsData(ip) {
             priority: 2
         },
         { 
+            name: 'CORS Anywhere Herokuapp',
+            url: (target) => `https://cors-anywhere.herokuapp.com/${target}`,
+            parseResponse: async (res) => await res.text(),
+            priority: 3
+        },
+        { 
             name: 'Proxy Cors',
             url: (target) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(target)}`,
             parseResponse: async (res) => await res.text(),
             priority: 2
+        },
+        { 
+            name: 'CrossOrigin.me',
+            url: (target) => `https://crossorigin.me/${target}`,
+            parseResponse: async (res) => await res.text(),
+            priority: 3
+        },
+        { 
+            name: 'JSONPlaceholder Proxy',
+            url: (target) => `https://jsonp.afeld.me/?url=${encodeURIComponent(target)}`,
+            parseResponse: async (res) => await res.text(),
+            priority: 3
         }
     ];
 
     // Sort by priority
     proxies.sort((a, b) => a.priority - b.priority);
 
-    // Try each proxy
+    // Try each proxy with retry
+    const maxRetries = 2;
+    
     for (const proxy of proxies) {
-        try {
-            const headers = {
-                'User-Agent': getRandomUserAgent(),
-                ...(proxy.headers || {})
-            };
-            
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-            
-            const response = await fetch(proxy.url(targetUrl), {
-                headers,
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`Trying ${proxy.name} (attempt ${attempt}/${maxRetries})...`);
+                
+                // Add delay between attempts
+                if (attempt > 1) {
+                    await delay(1000 * attempt);
+                }
+                
+                const headers = {
+                    'User-Agent': getRandomUserAgent(),
+                    ...(proxy.headers || {})
+                };
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(proxy.url(targetUrl), {
+                    headers,
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
 
-            if (!response.ok) {
-                continue;
-            }
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
 
-            const html = await proxy.parseResponse(response);
-            
-            if (!html || html.length < 1000) {
-                continue;
+                const html = await proxy.parseResponse(response);
+                
+                // Validate HTML
+                if (!html || html.length < 1000) {
+                    throw new Error('HTML too short or empty');
+                }
+                
+                if (!html.includes('Fraud Score') && !html.includes('scamalytics')) {
+                    throw new Error('Invalid Scamalytics HTML');
+                }
+                
+                console.log(`✓ ${proxy.name} successful!`);
+                
+                const parsed = parseScamalyticsHTML(html, ip);
+                
+                // Validate parsed data
+                if (Object.keys(parsed.details).length === 0) {
+                    throw new Error('No data extracted');
+                }
+                
+                return parsed;
+                
+            } catch (error) {
+                console.log(`✗ ${proxy.name} failed (attempt ${attempt}): ${error.message}`);
+                
+                // If last attempt, continue to next proxy
+                if (attempt === maxRetries) {
+                    await delay(500);
+                }
             }
-            
-            if (!html.includes('Fraud Score') && !html.includes('scamalytics')) {
-                continue;
-            }
-            
-            const parsed = parseScamalyticsHTML(html, ip);
-            
-            if (Object.keys(parsed.details).length === 0) {
-                continue;
-            }
-            
-            return parsed;
-            
-        } catch (error) {
-            continue;
         }
     }
 
-    throw new Error('All methods failed. Please try again later.');
+    // If all failed
+    throw new Error('All proxy methods failed. Please try again later.');
 }
 
 function parseScamalyticsHTML(html, ip) {
+    // Create a simple HTML parser (since DOMParser is not available in Workers)
+    // We'll use regex to extract data
+    
     let fraudScore = 0;
     let riskLevel = 'unknown';
     const details = {};
@@ -597,27 +635,17 @@ function parseScamalyticsHTML(html, ip) {
     }
     
     // Extract table data using regex
-    const tableRowRegex = /<th>([^<]+)<\/th>\s*<td>(?:<[^>]*>)?([^<]+)/gi;
+    const tableRowRegex = /<tr>\s*<th>([^<]+)<\/th>\s*<td>(?:<div class="risk[^"]*">)?([^<]+)(?:<\/div>)?<\/td>\s*<\/tr>/gi;
     let match;
     
     while ((match = tableRowRegex.exec(html)) !== null) {
         const key = match[1].trim();
-        let value = match[2].trim();
+        const value = match[2].trim();
         
-        if (key && value && value !== 'n/a' && !key.includes('title')) {
+        if (key && value && value !== 'n/a') {
             details[key] = value;
         }
     }
-    
-    // Extract risk indicators (Yes/No)
-    const riskIndicators = ['Anonymizing VPN', 'Tor Exit Node', 'Server', 'Public Proxy', 'Web Proxy', 'Search Engine Robot', 'Datacenter'];
-    riskIndicators.forEach(indicator => {
-        const regex = new RegExp(`<th>${indicator}</th>\\s*<td>.*?<div class="risk[^"]*">([^<]+)</div>`, 'i');
-        const match = html.match(regex);
-        if (match) {
-            details[indicator] = match[1].trim();
-        }
-    });
     
     // Extract ISP Name from link
     const ispMatch = html.match(/<a href="[^"]*\/ip\/isp\/[^"]*">([^<]+)<\/a>/i);
@@ -651,9 +679,14 @@ function getRandomUserAgent() {
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     ];
     return userAgents[Math.floor(Math.random() * userAgents.length)];
+}
+
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function jsonResponse(data, status = 200) {
