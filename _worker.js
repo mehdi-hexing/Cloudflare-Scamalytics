@@ -1,3 +1,5 @@
+// Cloudflare Worker for Scamalytics IP Checker
+// Complete standalone file - includes HTML, API, and all logic
 
 const HTML_PAGE = `<!DOCTYPE html>
 <html lang="en">
@@ -201,17 +203,7 @@ const HTML_PAGE = `<!DOCTYPE html>
             showLoading();
 
             try {
-                const data = await fetchIPData(ipInput);
-                displayResults(data);
-            } catch (error) {
-                console.error('Error:', error);
-                showError(error.message || 'Error fetching data. Please try again.');
-            }
-        }
-
-        async function fetchIPData(ip) {
-            try {
-                const response = await fetch(\`/api/\${ip}\`);
+                const response = await fetch(\`/api/\${ipInput}\`);
                 
                 if (!response.ok) {
                     throw new Error('Failed to fetch IP data');
@@ -223,7 +215,7 @@ const HTML_PAGE = `<!DOCTYPE html>
                     throw new Error(data.message || 'Failed to fetch IP data');
                 }
                 
-                return {
+                displayResults({
                     ip: data.ip,
                     fraudScore: data.fraud_score,
                     riskLevel: translateRiskFromEnglish(data.risk),
@@ -245,10 +237,11 @@ const HTML_PAGE = `<!DOCTYPE html>
                         'Server': data.details.server || '-',
                         'Web Proxy': data.details.web_proxy || '-'
                     }
-                };
+                });
                 
             } catch (error) {
-                throw error;
+                console.error('Error:', error);
+                showError(error.message || 'Error fetching data. Please try again.');
             }
         }
 
