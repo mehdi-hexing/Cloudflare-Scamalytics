@@ -1,7 +1,5 @@
 
-const HTML_PAGE = `
-
-<!DOCTYPE html>
+const HTML_PAGE = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
