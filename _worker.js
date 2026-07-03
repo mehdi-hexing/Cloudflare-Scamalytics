@@ -4,7 +4,7 @@ const HTML_PAGE = `
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scamalytics IP Checker - API & Fraund Risk Score Analysis</title>
+    <title>Scamalytics IP Checker - API & Fraud Risk Score Analysis</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -160,7 +160,6 @@ const HTML_PAGE = `
     </div>
 
     <script>
-        // Check URL path and parameters on load
         window.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             const paramIP = urlParams.get('ip');
@@ -171,7 +170,6 @@ const HTML_PAGE = `
             }
         });
 
-        // Allow Enter key to submit
         document.getElementById('ipInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 checkIP();
@@ -181,7 +179,6 @@ const HTML_PAGE = `
         async function checkIP() {
             const ipInput = document.getElementById('ipInput').value.trim();
             
-            // Validate IP
             if (!ipInput) {
                 showError('Please enter an IP address');
                 return;
@@ -192,12 +189,10 @@ const HTML_PAGE = `
                 return;
             }
 
-            // Update URL
             const url = new URL(window.location);
             url.searchParams.set('ip', ipInput);
             window.history.pushState({}, '', url);
 
-            // Show loading
             showLoading();
 
             try {
@@ -256,15 +251,12 @@ const HTML_PAGE = `
         }
 
         function displayResults(data) {
-            // Hide loading and error
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('error').classList.add('hidden');
             
-            // Show results
             const resultsDiv = document.getElementById('results');
             resultsDiv.classList.remove('hidden');
 
-            // Set score card color based on risk
             const scoreCard = document.getElementById('scoreCard');
             if (data.fraudScore <= 25) {
                 scoreCard.className = 'rounded-2xl shadow-xl p-8 mb-6 text-white risk-low';
@@ -276,17 +268,14 @@ const HTML_PAGE = `
                 scoreCard.className = 'rounded-2xl shadow-xl p-8 mb-6 text-white risk-very-high';
             }
 
-            // Update score
             document.getElementById('fraudScore').textContent = data.fraudScore;
             document.getElementById('riskLevel').textContent = data.riskLevel;
 
-            // Update IP info
             document.getElementById('ipAddress').textContent = data.ip;
             document.getElementById('country').textContent = data.details['Country Name'] || '-';
             document.getElementById('city').textContent = data.details['City'] || '-';
             document.getElementById('isp').textContent = data.details['ISP Name'] || data.details['ISP'] || data.details['Organization Name'] || '-';
 
-            // Update risk factors
             const riskFactorsDiv = document.getElementById('riskFactors');
             riskFactorsDiv.innerHTML = '';
             
@@ -313,7 +302,6 @@ const HTML_PAGE = `
                 \`;
             });
 
-            // Update additional info
             const additionalInfoDiv = document.getElementById('additionalInfo');
             additionalInfoDiv.innerHTML = '';
             
@@ -369,11 +357,13 @@ const HTML_PAGE = `
 addEventListener('fetch', event => {
     event.respondWith(handleRequest(event.request));
 });
+
 export default {
     async fetch(request, env, ctx) {
         return handleRequest(request);
     }
 };
+
 export async function onRequest(context) {
     return handleRequest(context.request);
 }
@@ -382,34 +372,26 @@ async function handleRequest(request) {
     const url = new URL(request.url);
     const path = url.pathname;
     
-    // Remove leading/trailing slashes
     const cleanPath = path.replace(/^\/+|\/+$/g, '');
-    
-    // Check if it's an API request
     let ip = null;
     
     if (cleanPath) {
-        // Check if path starts with 'api/'
         if (cleanPath.startsWith('api/')) {
-            ip = cleanPath.substring(4); // Remove 'api/' prefix
+            ip = cleanPath.substring(4);
         } else {
-            // Direct IP in path
             ip = cleanPath;
         }
         
-        // Validate if it's an IP
         if (ip && isValidIP(ip)) {
-            return handleAPIRequest(ip);
+            return handleAPIRequest(ip, request);
         }
     }
     
-    // Check for ?api=IP parameter
     const apiParam = url.searchParams.get('api');
     if (apiParam) {
-        return handleAPIRequest(apiParam);
+        return handleAPIRequest(apiParam, request);
     }
     
-    // Default: serve HTML page
     return new Response(HTML_PAGE, {
         headers: {
             'Content-Type': 'text/html;charset=UTF-8',
@@ -418,8 +400,7 @@ async function handleRequest(request) {
     });
 }
 
-async function handleAPIRequest(ip) {
-    // Validate IP
+async function handleAPIRequest(ip, request) {
     if (!isValidIP(ip)) {
         return jsonResponse({
             error: true,
@@ -427,12 +408,26 @@ async function handleAPIRequest(ip) {
             ip: ip
         }, 400);
     }
+
+    const cacheUrl = new URL(request.url);
+    cacheUrl.pathname = `/api-cache/${ip}`;
+    cacheUrl.search = '';
+    const cacheKey = new Request(cacheUrl.toString(), { method: 'GET' });
+    const cache = caches.default;
+
+    let cachedResponse = await cache.match(cacheKey);
+    if (cachedResponse) {
+        const responseHeaders = new Headers(cachedResponse.headers);
+        responseHeaders.set('X-Cache', 'HIT');
+        return new Response(cachedResponse.body, {
+            status: cachedResponse.status,
+            headers: responseHeaders
+        });
+    }
     
     try {
-        // Fetch data from Scamalytics
         const data = await fetchScamalyticsData(ip);
         
-        // Return clean JSON response
         const apiResponse = {
             success: true,
             ip: data.ip,
@@ -457,7 +452,13 @@ async function handleAPIRequest(ip) {
             }
         };
         
-        return jsonResponse(apiResponse);
+        const finalResponse = jsonResponse(apiResponse);
+        finalResponse.headers.set('X-Cache', 'MISS');
+        finalResponse.headers.set('Cache-Control', 'public, max-age=3600');
+
+        await cache.put(cacheKey, finalResponse.clone());
+        
+        return finalResponse;
         
     } catch (error) {
         return jsonResponse({
@@ -471,149 +472,126 @@ async function handleAPIRequest(ip) {
 async function fetchScamalyticsData(ip) {
     const targetUrl = `https://scamalytics.com/ip/${ip}`;
     
-    // Enhanced CORS proxies with retry
-    const proxies = [
-        { 
-            name: 'AllOrigins',
-            url: (target) => `https://api.allorigins.win/get?url=${encodeURIComponent(target)}`,
-            parseResponse: async (res) => {
-                const json = await res.json();
-                return json.contents;
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1800);
+        
+        const response = await fetch(targetUrl, {
+            headers: {
+                'User-Agent': getRandomUserAgent(),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
             },
-            priority: 1
-        },
-        { 
-            name: 'AllOrigins Raw',
-            url: (target) => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
-            parseResponse: async (res) => await res.text(),
-            priority: 1
-        },
-        { 
-            name: 'CORS.SH',
-            url: (target) => `https://cors.sh/${target}`,
-            parseResponse: async (res) => await res.text(),
-            priority: 2,
-            headers: { 'x-cors-api-key': 'temp_' + Math.random() }
-        },
-        { 
-            name: 'ThingProxy',
-            url: (target) => `https://thingproxy.freeboard.io/fetch/${target}`,
-            parseResponse: async (res) => await res.text(),
-            priority: 2
-        },
-        { 
-            name: 'CORS Anywhere Herokuapp',
-            url: (target) => `https://cors-anywhere.herokuapp.com/${target}`,
-            parseResponse: async (res) => await res.text(),
-            priority: 3
-        },
-        { 
-            name: 'Proxy Cors',
-            url: (target) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(target)}`,
-            parseResponse: async (res) => await res.text(),
-            priority: 2
-        },
-        { 
-            name: 'CrossOrigin.me',
-            url: (target) => `https://crossorigin.me/${target}`,
-            parseResponse: async (res) => await res.text(),
-            priority: 3
-        },
-        { 
-            name: 'JSONPlaceholder Proxy',
-            url: (target) => `https://jsonp.afeld.me/?url=${encodeURIComponent(target)}`,
-            parseResponse: async (res) => await res.text(),
-            priority: 3
-        }
-    ];
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
 
-    // Sort by priority
-    proxies.sort((a, b) => a.priority - b.priority);
-
-    // Try each proxy with retry
-    const maxRetries = 2;
-    
-    for (const proxy of proxies) {
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                console.log(`Trying ${proxy.name} (attempt ${attempt}/${maxRetries})...`);
-                
-                // Add delay between attempts
-                if (attempt > 1) {
-                    await delay(1000 * attempt);
-                }
-                
-                const headers = {
-                    'User-Agent': getRandomUserAgent(),
-                    ...(proxy.headers || {})
-                };
-                
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000);
-                
-                const response = await fetch(proxy.url(targetUrl), {
-                    headers,
-                    signal: controller.signal
-                });
-                
-                clearTimeout(timeoutId);
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                const html = await proxy.parseResponse(response);
-                
-                // Validate HTML
-                if (!html || html.length < 1000) {
-                    throw new Error('HTML too short or empty');
-                }
-                
-                if (!html.includes('Fraud Score') && !html.includes('scamalytics')) {
-                    throw new Error('Invalid Scamalytics HTML');
-                }
-                
-                console.log(`✓ ${proxy.name} successful!`);
-                
-                const parsed = parseScamalyticsHTML(html, ip);
-                
-                // Validate parsed data
-                if (Object.keys(parsed.details).length === 0) {
-                    throw new Error('No data extracted');
-                }
-                
-                return parsed;
-                
-            } catch (error) {
-                console.log(`✗ ${proxy.name} failed (attempt ${attempt}): ${error.message}`);
-                
-                // If last attempt, continue to next proxy
-                if (attempt === maxRetries) {
-                    await delay(500);
-                }
+        if (response.ok) {
+            const html = await response.text();
+            if (html && html.length > 1000 && (html.includes('Fraud Score') || html.includes('scamalytics'))) {
+                return parseScamalyticsHTML(html, ip);
             }
         }
+    } catch (e) {
+    
     }
 
-    // If all failed
-    throw new Error('All proxy methods failed. Please try again later.');
+    const groupA = [
+        { name: 'CorsProxyIO', url: `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}` },
+        { name: 'Codetabs', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}` },
+        { name: 'AllOrigins Raw', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}` }
+    ];
+
+    try {
+        const html = await raceProxies(groupA, 4000);
+        return parseScamalyticsHTML(html, ip);
+    } catch (eA) {
+        
+        const groupB = [
+            { name: 'ThingProxy', url: `https://thingproxy.freeboard.io/fetch/${targetUrl}` },
+            { name: 'JSONPlaceholder Proxy', url: `https://jsonp.afeld.me/?url=${encodeURIComponent(targetUrl)}` }
+        ];
+
+        try {
+            const html = await raceProxies(groupB, 5000);
+            return parseScamalyticsHTML(html, ip);
+        } catch (eB) {
+            throw new Error('All connection paths and mirror proxies failed. Please try again.');
+        }
+    }
+}
+
+async function raceProxies(proxyList, timeoutMs) {
+    const promises = proxyList.map(proxy => {
+        return (async () => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            
+            try {
+                const response = await fetch(proxy.url, {
+                    headers: { 'User-Agent': getRandomUserAgent() },
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`Status ${response.status}`);
+                }
+                
+                const html = await response.text();
+                
+                if (!html || html.length < 1000) {
+                    throw new Error('Response too short');
+                }
+                if (!html.includes('Fraud Score') && !html.includes('scamalytics')) {
+                    throw new Error('Invalid HTML structure');
+                }
+                
+                return html;
+            } catch (err) {
+                clearTimeout(timeoutId);
+                throw err;
+            }
+        })();
+    });
+
+    return new Promise((resolve, reject) => {
+        let errors = [];
+        let resolved = false;
+        
+        promises.forEach(p => {
+            p.then(val => {
+                if (!resolved) {
+                    resolved = true;
+                    resolve(val);
+                }
+            }).catch(err => {
+                errors.push(err.message);
+                if (errors.length === promises.length && !resolved) {
+                    reject(new Error("All parallel attempts failed"));
+                }
+            });
+        });
+        
+        setTimeout(() => {
+            if (!resolved) {
+                resolved = true;
+                reject(new Error("Race timeout"));
+            }
+        }, timeoutMs + 200);
+    });
 }
 
 function parseScamalyticsHTML(html, ip) {
-    // Create a simple HTML parser (since DOMParser is not available in Workers)
-    // We'll use regex to extract data
-    
     let fraudScore = 0;
     let riskLevel = 'unknown';
     const details = {};
     
-    // Extract Fraud Score
     const scoreMatch = html.match(/Fraud Score:\s*(\d+)/i);
     if (scoreMatch) {
         fraudScore = parseInt(scoreMatch[1]);
     }
     
-    // Extract Risk Level from panel_title
     const riskMatch = html.match(/<div class="panel_title[^"]*"[^>]*>(.*?)<\/div>/i);
     if (riskMatch) {
         const riskText = riskMatch[1].trim();
@@ -625,7 +603,6 @@ function parseScamalyticsHTML(html, ip) {
         else if (riskText.includes('Very High Risk')) riskLevel = 'very_high';
     }
     
-    // Fallback based on score
     if (riskLevel === 'unknown') {
         if (fraudScore === 0) riskLevel = 'very_low';
         else if (fraudScore <= 25) riskLevel = 'low';
@@ -634,7 +611,6 @@ function parseScamalyticsHTML(html, ip) {
         else riskLevel = 'very_high';
     }
     
-    // Extract table data using regex
     const tableRowRegex = /<tr>\s*<th>([^<]+)<\/th>\s*<td>(?:<div class="risk[^"]*">)?([^<]+)(?:<\/div>)?<\/td>\s*<\/tr>/gi;
     let match;
     
@@ -647,7 +623,6 @@ function parseScamalyticsHTML(html, ip) {
         }
     }
     
-    // Extract ISP Name from link
     const ispMatch = html.match(/<a href="[^"]*\/ip\/isp\/[^"]*">([^<]+)<\/a>/i);
     if (ispMatch) {
         details['ISP Name'] = ispMatch[1].trim();
@@ -679,14 +654,9 @@ function getRandomUserAgent() {
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
     ];
     return userAgents[Math.floor(Math.random() * userAgents.length)];
-}
-
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function jsonResponse(data, status = 200) {
@@ -697,7 +667,6 @@ function jsonResponse(data, status = 200) {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type',
-            'Cache-Control': 'public, max-age=300'
         }
     });
 }
