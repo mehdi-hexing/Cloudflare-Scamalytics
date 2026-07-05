@@ -209,9 +209,9 @@ const HTML_PAGE = `
                 }
                 
                 displayResults({
-                    ip: data.ip,
-                    fraudScore: data.fraud_score,
-                    riskLevel: translateRiskFromEnglish(data.risk),
+                    ip: data.info.ip,
+                    fraudScore: data.info.fraud_score,
+                    riskLevel: translateRiskFromEnglish(data.info.risk),
                     details: {
                         'Country Name': data.details.country || '-',
                         'Country Code': data.details.country_code || '-',
@@ -430,7 +430,6 @@ async function handleAPIRequest(ip, request) {
         
 const apiResponse = {
     info: {
-        success: true,
         ip: data.ip,
         fraud_score: data.fraudScore,
         risk: data.risk
