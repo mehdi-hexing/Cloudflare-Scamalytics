@@ -430,6 +430,7 @@ async function handleAPIRequest(ip, request) {
         
 const apiResponse = {
     info: {
+        success: true,
         ip: data.ip,
         fraud_score: data.fraudScore,
         risk: data.risk
