@@ -428,29 +428,32 @@ async function handleAPIRequest(ip, request) {
     try {
         const data = await fetchScamalyticsData(ip);
         
-        const apiResponse = {
-            success: true,
-            ip: data.ip,
-            fraud_score: data.fraudScore,
-            risk: data.risk,
-            details: {
-                country: data.details['Country Name'] || null,
-                country_code: data.details['Country Code'] || null,
-                city: data.details['City'] || null,
-                state: data.details['State / Province'] || null,
-                postal_code: data.details['Postal Code'] || null,
-                isp: data.details['ISP Name'] || data.details['ISP'] || null,
-                organization: data.details['Organization Name'] || null,
-                hostname: data.details['Hostname'] || null,
-                asn: data.details['ASN'] || null,
-                datacenter: data.details['Datacenter'] || null,
-                vpn: data.details['Anonymizing VPN'] || null,
-                tor: data.details['Tor Exit Node'] || null,
-                proxy: data.details['Public Proxy'] || null,
-                server: data.details['Server'] || null,
-                web_proxy: data.details['Web Proxy'] || null
-            }
-        };
+const apiResponse = {
+    
+    info: {
+        ip: data.ip,
+        fraud_score: data.fraudScore,
+        risk: data.risk
+    },
+    
+    details: {
+        country: data.details['Country Name'] || null,
+        country_code: data.details['Country Code'] || null,
+        city: data.details['City'] || null,
+        state: data.details['State / Province'] || null,
+        postal_code: data.details['Postal Code'] || null,
+        isp: data.details['ISP Name'] || data.details['ISP'] || null,
+        organization: data.details['Organization Name'] || null,
+        hostname: data.details['Hostname'] || null,
+        asn: data.details['ASN'] || null,
+        datacenter: data.details['Datacenter'] || null,
+        vpn: data.details['Anonymizing VPN'] || null,
+        tor: data.details['Tor Exit Node'] || null,
+        proxy: data.details['Public Proxy'] || null,
+        server: data.details['Server'] || null,
+        web_proxy: data.details['Web Proxy'] || null
+    }
+};
         
         const finalResponse = jsonResponse(apiResponse);
         finalResponse.headers.set('X-Cache', 'MISS');
