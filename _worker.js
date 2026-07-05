@@ -429,13 +429,11 @@ async function handleAPIRequest(ip, request) {
         const data = await fetchScamalyticsData(ip);
         
 const apiResponse = {
-    
     info: {
         ip: data.ip,
         fraud_score: data.fraudScore,
         risk: data.risk
     },
-    
     details: {
         country: data.details['Country Name'] || null,
         country_code: data.details['Country Code'] || null,
