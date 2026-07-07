@@ -213,7 +213,7 @@ const HTML_PAGE = `
                     fraudScore: data.info.fraud_score,
                     riskLevel: translateRiskFromEnglish(data.info.risk),
                     details: {
-                        'Country Name': data.details.country || '-',
+                        'Country Name': `${data.details.country || '-'} ${data.details.flag || ''}`,
                         'Country Code': data.details.country_code || '-',
                         'City': data.details.city || '-',
                         'ISP': data.details.isp || '-',
@@ -428,30 +428,35 @@ async function handleAPIRequest(ip, request) {
     try {
         const data = await fetchScamalyticsData(ip);
         
-const apiResponse = {
-    info: {
-        ip: data.ip,
-        fraud_score: data.fraudScore,
-        risk: data.risk
-    },
-    details: {
-        country: data.details['Country Name'] || null,
-        country_code: data.details['Country Code'] || null,
-        city: data.details['City'] || null,
-        state: data.details['State / Province'] || null,
-        postal_code: data.details['Postal Code'] || null,
-        isp: data.details['ISP Name'] || data.details['ISP'] || null,
-        organization: data.details['Organization Name'] || null,
-        hostname: data.details['Hostname'] || null,
-        asn: data.details['ASN'] || null,
-        datacenter: data.details['Datacenter'] || null,
-        vpn: data.details['Anonymizing VPN'] || null,
-        tor: data.details['Tor Exit Node'] || null,
-        proxy: data.details['Public Proxy'] || null,
-        server: data.details['Server'] || null,
-        web_proxy: data.details['Web Proxy'] || null
-    }
-};
+const countryCode = data.details['Country Code'] || null;
+        const flagEmoji = getFlagEmoji(countryCode);
+
+        const apiResponse = {
+            info: {
+                success: true,
+                ip: data.ip,
+                fraud_score: data.fraudScore,
+                risk: data.risk
+            },
+            details: {
+                country: data.details['Country Name'] || null,
+                country_code: countryCode,
+                flag: flagEmoji,
+                state: data.details['State / Province'] || null,
+                city: data.details['City'] || null,
+                postal_code: data.details['Postal Code'] || null,
+                isp: data.details['ISP Name'] || data.details['ISP'] || null,
+                organization: data.details['Organization Name'] || null,
+                hostname: data.details['Hostname'] || null,
+                asn: data.details['ASN'] || null,
+                datacenter: data.details['Datacenter'] || null,
+                vpn: data.details['Anonymizing VPN'] || null,
+                tor: data.details['Tor Exit Node'] || null,
+                proxy: data.details['Public Proxy'] || null,
+                server: data.details['Server'] || null,
+                web_proxy: data.details['Web Proxy'] || null
+            }
+        };
         
         const finalResponse = jsonResponse(apiResponse);
         finalResponse.headers.set('X-Cache', 'MISS');
@@ -648,6 +653,19 @@ function isValidIP(ip) {
     }
     
     return ipv6Regex.test(ip);
+}
+
+function getFlagEmoji(countryCode) {
+    if (!countryCode || countryCode.length !== 2) return "";
+    const codePoints = countryCode
+        .toUpperCase()
+        .split('')
+        .map(char => 127397 + char.charCodeAt(0));
+    try {
+        return String.fromCodePoint(...codePoints);
+    } catch (e) {
+        return "";
+    }
 }
 
 function getRandomUserAgent() {
