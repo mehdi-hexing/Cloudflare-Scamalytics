@@ -213,7 +213,7 @@ const HTML_PAGE = `
                     fraudScore: data.info.fraud_score,
                     riskLevel: translateRiskFromEnglish(data.info.risk),
                     details: {
-                        'Country Name': `${data.details.country || '-'} ${data.details.flag || ''}`,
+                        'Country Name': (data.details.country || '-') + ' ' + (data.details.flag || ''),
                         'Country Code': data.details.country_code || '-',
                         'City': data.details.city || '-',
                         'ISP': data.details.isp || '-',
