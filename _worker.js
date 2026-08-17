@@ -61,24 +61,39 @@ const HTML_PAGE = `
             <p class="text-gray-600">Check IP Fraud Risk & Score Analysis</p>
         </div>
 
+        <!-- Tab Switcher -->
+        <div class="mb-6">
+            <div class="flex gap-2 bg-white rounded-xl shadow-lg p-2">
+                <button id="tabScamalyticsBtn" onclick="switchTab('scamalytics')" class="flex-1 py-2 px-4 rounded-lg font-semibold transition-colors bg-blue-600 text-white">
+                    Scamalytics IP Check
+                </button>
+                <button id="tabCheckhostBtn" onclick="switchTab('checkhost')" class="flex-1 py-2 px-4 rounded-lg font-semibold transition-colors text-gray-600 hover:bg-gray-100">
+                    Check-Host Network Test
+                </button>
+            </div>
+        </div>
+
+        <!-- ===================== Scamalytics Panel ===================== -->
+        <div id="scamalyticsPanel">
+
         <!-- Input Section -->
         <div class="bg-white rounded-2xl shadow-xl p-6 mb-8">
             <div class="flex flex-col sm:flex-row gap-4">
                 <input 
                     type="text" 
                     id="ipInput" 
-                    placeholder="Enter IP address (127.0.0.1,...)"
+                    placeholder="Enter IP (IPv4/IPv6) or domain, e.g. 8.8.8.8, 2001:4860:4860::8888, example.com"
                     class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
                 />
                 <button 
                     onclick="checkIP()" 
                     id="checkBtn"
                     class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition-all transform hover:scale-105 active:scale-95">
-                    Check IP
+                    Check
                 </button>
             </div>
             <p class="text-sm text-gray-500 mt-3">You can also use URL parameter: ?ip=8.8.8.8</p>
-            <p class="text-sm text-blue-600 mt-2">API Endpoints: <code class="bg-gray-100 px-2 py-1 rounded">/8.8.8.8</code> or <code class="bg-gray-100 px-2 py-1 rounded">/api/8.8.8.8</code></p>
+            <p class="text-sm text-blue-600 mt-2">API Endpoints: <code class="bg-gray-100 px-2 py-1 rounded">/8.8.8.8</code>, <code class="bg-gray-100 px-2 py-1 rounded">/api/example.com</code> (IPv4, IPv6 and domains are all supported — a domain is resolved and every IP behind it is checked)</p>
         </div>
 
         <!-- Loading -->
@@ -157,6 +172,123 @@ const HTML_PAGE = `
                 </div>
             </div>
         </div>
+
+        <!-- Domain Results (a domain can resolve to several IPs; each is checked separately) -->
+        <div id="domainResults" class="hidden fade-in">
+            <div class="bg-white rounded-2xl shadow-xl p-6 mb-4">
+                <h2 class="text-xl font-bold text-gray-800 mb-1">Domain: <span id="domainName" class="text-blue-600"></span></h2>
+                <p class="text-sm text-gray-500"><span id="domainIpCount">0</span> IP address(es) resolved. Each one is checked separately below.</p>
+            </div>
+            <div id="domainResultsList" class="space-y-4"></div>
+        </div>
+
+        </div>
+        <!-- ===================== End Scamalytics Panel ===================== -->
+
+        <!-- ===================== Check-Host Panel (fully isolated, own state & endpoints) ===================== -->
+        <div id="checkhostPanel" class="hidden">
+
+            <!-- Input Section -->
+            <div class="bg-white rounded-2xl shadow-xl p-6 mb-8">
+                <div class="flex flex-col sm:flex-row gap-4 mb-4">
+                    <input
+                        type="text"
+                        id="chHostInput"
+                        placeholder="Host, domain or IP (e.g. example.com or smtp://gmail.com)"
+                        class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
+                    />
+                    <select id="chTypeSelect" class="px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500">
+                        <option value="ping">Ping</option>
+                        <option value="http">HTTP</option>
+                        <option value="tcp">TCP</option>
+                        <option value="udp">UDP</option>
+                        <option value="dns">DNS</option>
+                    </select>
+                    <button
+                        onclick="chRunCheck()"
+                        id="chCheckBtn"
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-8 py-3 rounded-lg transition-all transform hover:scale-105 active:scale-95">
+                        Run Check
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-4 mb-3">
+                    <label class="text-sm text-gray-600">Fallback max nodes (used only if no country below has a node count selected):</label>
+                    <input type="number" id="chMaxNodes" value="3" min="1" max="10" class="w-20 px-2 py-1 border-2 border-gray-300 rounded-lg text-sm">
+                </div>
+
+                <div class="border-t pt-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-semibold text-gray-700">Countries</h3>
+                        <button onclick="chResetNodeSelection()" class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg">Reset</button>
+                    </div>
+                    <p class="text-xs text-gray-400 mb-2">The country list, and how many nodes exist in each one, come directly from check-host.net's own node list — the worker just relays it.</p>
+
+                    <div class="relative mb-3">
+                        <button
+                            type="button"
+                            id="chCountryDropdownBtn"
+                            onclick="chToggleCountryDropdown()"
+                            class="w-full flex justify-between items-center px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors bg-white text-left">
+                            <span id="chCountryDropdownLabel" class="text-gray-500">Loading countries...</span>
+                            <span class="text-gray-400">&#9662;</span>
+                        </button>
+                        <div id="chCountryDropdownPanel" class="hidden absolute left-0 right-0 mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg z-20">
+                            <input
+                                type="text"
+                                id="chCountrySearch"
+                                placeholder="Search countries..."
+                                oninput="chFilterCountryOptions()"
+                                class="w-full px-3 py-2 border-b-2 border-gray-200 rounded-t-lg focus:outline-none text-sm" />
+                            <div id="chCountryOptionsList" class="max-h-56 overflow-y-auto"></div>
+                        </div>
+                    </div>
+
+                    <h4 class="text-sm font-semibold text-gray-700 mb-2">Nodes to use per selected country</h4>
+                    <div id="chNodesList" class="divide-y max-h-56 overflow-y-auto border rounded-lg">
+                        <p class="text-gray-400 text-sm p-3">Select one or more countries above.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div id="chLoading" class="hidden text-center py-12">
+                <div class="loading mx-auto mb-4"></div>
+                <p class="text-gray-600">Running check across nodes...</p>
+            </div>
+
+
+            <!-- Error -->
+            <div id="chError" class="hidden bg-red-50 border-2 border-red-200 rounded-2xl p-6 mb-8 fade-in">
+                <div class="flex items-center gap-3">
+                    <span class="text-3xl">⚠️</span>
+                    <div>
+                        <h3 class="font-bold text-red-800">Error Running Check</h3>
+                        <p id="chErrorMessage" class="text-red-600"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div id="chResults" class="hidden fade-in bg-white rounded-2xl shadow-xl p-6">
+                <h3 class="font-bold text-lg mb-4 text-gray-800">Results</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b-2">
+                                <th class="py-2 px-3">Location</th>
+                                <th class="py-2 px-3">Node</th>
+                                <th class="py-2 px-3">Result</th>
+                            </tr>
+                        </thead>
+                        <tbody id="chResultsTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+        <!-- ===================== End Check-Host Panel ===================== -->
+
     </div>
 
     <script>
@@ -177,61 +309,64 @@ const HTML_PAGE = `
         });
 
         async function checkIP() {
-            const ipInput = document.getElementById('ipInput').value.trim();
-            
-            if (!ipInput) {
-                showError('Please enter an IP address');
+            const rawInput = document.getElementById('ipInput').value.trim();
+
+            if (!rawInput) {
+                showError('Please enter an IP address or domain');
                 return;
             }
-            
-            if (!isValidIP(ipInput)) {
-                showError('Invalid IP address format');
+
+            const inputIsIP = isValidIP(rawInput);
+            const inputIsDomain = !inputIsIP && isValidDomain(rawInput);
+
+            if (!inputIsIP && !inputIsDomain) {
+                showError('Invalid IP address or domain format');
                 return;
             }
 
             const url = new URL(window.location);
-            url.searchParams.set('ip', ipInput);
+            url.searchParams.set('ip', rawInput);
             window.history.pushState({}, '', url);
 
             showLoading();
 
             try {
-                const response = await fetch(\`/api/\${ipInput}\`);
-                
-                if (!response.ok) {
-                    throw new Error('Failed to fetch IP data');
-                }
-                
+                const response = await fetch(\`/api/\${rawInput}\`);
                 const data = await response.json();
-                
-                if (data.error) {
-                    throw new Error(data.message || 'Failed to fetch IP data');
+
+                if (!response.ok || data.error) {
+                    throw new Error(data.message || 'Failed to fetch data');
                 }
-                
-                displayResults({
-                    ip: data.info.ip,
-                    fraudScore: data.info.fraud_score,
-                    riskLevel: translateRiskFromEnglish(data.info.risk),
-                    details: {
-                        'Country Name': (data.details.country || '-') + ' ' + (data.details.flag || ''),
-                        'Country Code': data.details.country_code || '-',
-                        'City': data.details.city || '-',
-                        'ISP': data.details.isp || '-',
-                        'ISP Name': data.details.isp || '-',
-                        'Organization Name': data.details.organization || '-',
-                        'Hostname': data.details.hostname || '-',
-                        'ASN': data.details.asn || '-',
-                        'State / Province': data.details.state || '-',
-                        'Postal Code': data.details.postal_code || '-',
-                        'Datacenter': data.details.datacenter || '-',
-                        'Anonymizing VPN': data.details.vpn || '-',
-                        'Tor Exit Node': data.details.tor || '-',
-                        'Public Proxy': data.details.proxy || '-',
-                        'Server': data.details.server || '-',
-                        'Web Proxy': data.details.web_proxy || '-'
-                    }
-                });
-                
+
+                if (Array.isArray(data.results)) {
+                    // Domain resolved to one or more IPs — each is a separate Scamalytics lookup.
+                    displayDomainResults(data.info.domain, data.results);
+                } else {
+                    displayResults({
+                        ip: data.info.ip,
+                        fraudScore: data.info.fraud_score,
+                        riskLevel: translateRiskFromEnglish(data.info.risk),
+                        details: {
+                            'Country Name': (data.details.country || '-') + ' ' + (data.details.flag || ''),
+                            'Country Code': data.details.country_code || '-',
+                            'City': data.details.city || '-',
+                            'ISP': data.details.isp || '-',
+                            'ISP Name': data.details.isp || '-',
+                            'Organization Name': data.details.organization || '-',
+                            'Hostname': data.details.hostname || '-',
+                            'ASN': data.details.asn || '-',
+                            'State / Province': data.details.state || '-',
+                            'Postal Code': data.details.postal_code || '-',
+                            'Datacenter': data.details.datacenter || '-',
+                            'Anonymizing VPN': data.details.vpn || '-',
+                            'Tor Exit Node': data.details.tor || '-',
+                            'Public Proxy': data.details.proxy || '-',
+                            'Server': data.details.server || '-',
+                            'Web Proxy': data.details.web_proxy || '-'
+                        }
+                    });
+                }
+
             } catch (error) {
                 console.error('Error:', error);
                 showError(error.message || 'Error fetching data. Please try again.');
@@ -253,6 +388,7 @@ const HTML_PAGE = `
         function displayResults(data) {
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('error').classList.add('hidden');
+            document.getElementById('domainResults').classList.add('hidden');
             
             const resultsDiv = document.getElementById('results');
             resultsDiv.classList.remove('hidden');
@@ -326,8 +462,65 @@ const HTML_PAGE = `
             });
         }
 
+        // Renders one compact card per IP behind a domain. Reuses the same risk-color
+        // classes (risk-low/medium/high/very-high) as the single-IP score card above.
+        function displayDomainResults(domain, results) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('error').classList.add('hidden');
+            document.getElementById('results').classList.add('hidden');
+
+            document.getElementById('domainResults').classList.remove('hidden');
+            document.getElementById('domainName').textContent = domain;
+            document.getElementById('domainIpCount').textContent = results.length;
+
+            const listDiv = document.getElementById('domainResultsList');
+            listDiv.innerHTML = '';
+
+            results.forEach(item => {
+                if (item.error) {
+                    listDiv.innerHTML += \`
+                        <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+                            <p class="font-semibold text-red-700">\${item.ip || 'Unknown IP'}</p>
+                            <p class="text-sm text-red-500">\${item.message || 'Failed to fetch data for this IP'}</p>
+                        </div>
+                    \`;
+                    return;
+                }
+
+                const score = item.fraud_score || 0;
+                let riskClass = 'risk-low';
+                if (score > 75) riskClass = 'risk-very-high';
+                else if (score > 50) riskClass = 'risk-high';
+                else if (score > 25) riskClass = 'risk-medium';
+
+                const details = item.details || {};
+                const country = ((details.country || '-') + ' ' + (details.flag || '')).trim();
+                const isp = details.isp || details.organization || '-';
+
+                listDiv.innerHTML += \`
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                        <div class="flex flex-col sm:flex-row">
+                            <div class="\${riskClass} text-white p-4 sm:w-40 flex flex-col items-center justify-center text-center">
+                                <div class="text-3xl font-bold">\${score}</div>
+                                <div class="text-xs">\${translateRiskFromEnglish(item.risk)}</div>
+                            </div>
+                            <div class="p-4 flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                                <div><span class="text-gray-500">IP:</span> <span class="font-semibold">\${item.ip}</span></div>
+                                <div><span class="text-gray-500">Country:</span> <span class="font-semibold">\${country}</span></div>
+                                <div><span class="text-gray-500">ISP:</span> <span class="font-semibold">\${isp}</span></div>
+                                <div><span class="text-gray-500">VPN:</span> <span class="font-semibold">\${details.vpn || '-'}</span></div>
+                                <div><span class="text-gray-500">Tor:</span> <span class="font-semibold">\${details.tor || '-'}</span></div>
+                                <div><span class="text-gray-500">Datacenter:</span> <span class="font-semibold">\${details.datacenter || '-'}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                \`;
+            });
+        }
+
         function showLoading() {
             document.getElementById('results').classList.add('hidden');
+            document.getElementById('domainResults').classList.add('hidden');
             document.getElementById('error').classList.add('hidden');
             document.getElementById('loading').classList.remove('hidden');
         }
@@ -335,20 +528,381 @@ const HTML_PAGE = `
         function showError(message) {
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('results').classList.add('hidden');
+            document.getElementById('domainResults').classList.add('hidden');
             document.getElementById('error').classList.remove('hidden');
             document.getElementById('errorMessage').textContent = message;
         }
 
         function isValidIP(ip) {
+            return isValidIPv4(ip) || isValidIPv6(ip);
+        }
+
+        function isValidIPv4(ip) {
             const ipv4Regex = /^(\\d{1,3}\\.){3}\\d{1,3}$/;
-            const ipv6Regex = /^([0-9a-fA-F]{0,4}:){7}[0-9a-fA-F]{0,4}$/;
-            
-            if (ipv4Regex.test(ip)) {
-                const parts = ip.split('.');
-                return parts.every(part => parseInt(part) >= 0 && parseInt(part) <= 255);
-            }
-            
+            if (!ipv4Regex.test(ip)) return false;
+            return ip.split('.').every(part => parseInt(part, 10) >= 0 && parseInt(part, 10) <= 255);
+        }
+
+        // Supports full-form, zero-compressed ("::") and IPv4-mapped IPv6 addresses.
+        function isValidIPv6(ip) {
+            const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))$/;
             return ipv6Regex.test(ip);
+        }
+
+        function isValidDomain(domain) {
+            if (!domain || domain.length > 253) return false;
+            const domainRegex = /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\\.[A-Za-z0-9-]{1,63})*\\.[A-Za-z]{2,}$/;
+            return domainRegex.test(domain);
+        }
+
+        // ===================== Check-Host Section (frontend) =====================
+        // Fully isolated from the Scamalytics logic above: separate state (chNodesCache),
+        // separate DOM ids (ch* prefix), separate endpoints (/checkhost/*), separate functions.
+
+        let chNodesCache = null;
+        // Maps country name -> array of node host-ids in that country.
+        // Built once from /checkhost/nodes; purely a client-side grouping of
+        // check-host.net's own data, nothing computed or guessed by the worker.
+        let chCountryMap = {};
+
+        function switchTab(tab) {
+            const scamBtn = document.getElementById('tabScamalyticsBtn');
+            const chBtn = document.getElementById('tabCheckhostBtn');
+            const scamPanel = document.getElementById('scamalyticsPanel');
+            const chPanel = document.getElementById('checkhostPanel');
+
+            const activeClass = 'flex-1 py-2 px-4 rounded-lg font-semibold transition-colors bg-blue-600 text-white';
+            const activeClassPurple = 'flex-1 py-2 px-4 rounded-lg font-semibold transition-colors bg-purple-600 text-white';
+            const inactiveClass = 'flex-1 py-2 px-4 rounded-lg font-semibold transition-colors text-gray-600 hover:bg-gray-100';
+
+            if (tab === 'scamalytics') {
+                scamPanel.classList.remove('hidden');
+                chPanel.classList.add('hidden');
+                scamBtn.className = activeClass;
+                chBtn.className = inactiveClass;
+            } else {
+                chPanel.classList.remove('hidden');
+                scamPanel.classList.add('hidden');
+                chBtn.className = activeClassPurple;
+                scamBtn.className = inactiveClass;
+                if (!chNodesCache) chLoadNodes();
+            }
+        }
+
+        async function chLoadNodes() {
+            const dropdownLabel = document.getElementById('chCountryDropdownLabel');
+            dropdownLabel.textContent = 'Loading countries...';
+            try {
+                const res = await fetch('/checkhost/nodes');
+                const data = await res.json();
+
+                if (!res.ok || data.ok === false) {
+                    throw new Error(data.message || ('HTTP ' + res.status));
+                }
+
+                chNodesCache = data.nodes || {};
+                chBuildCountryMap();
+                chRenderCountryOptions();
+                chUpdateCountryDropdownLabel();
+            } catch (e) {
+                console.error('Check-Host node list error:', e);
+                dropdownLabel.textContent = 'Failed to load countries';
+                document.getElementById('chNodesList').innerHTML =
+                    '<p class="text-red-500 text-sm p-3">Failed to load the node list from check-host.net (' +
+                    (e.message || 'unknown error') +
+                    '). You can still run a check using the "max nodes" fallback above.</p>';
+            }
+        }
+
+        // Groups nodes by country exactly as check-host.net reports them.
+        // Nothing here is invented — country names and per-country counts are
+        // whatever /checkhost/nodes (a thin relay of check-host.net) returned.
+        function chBuildCountryMap() {
+            const countries = {};
+            Object.keys(chNodesCache).forEach(hostId => {
+                const info = chNodesCache[hostId] || {};
+                const countryName = info.country || 'Unknown';
+                if (!countries[countryName]) countries[countryName] = [];
+                countries[countryName].push(hostId);
+            });
+            Object.keys(countries).forEach(c => countries[c].sort());
+            chCountryMap = countries;
+        }
+
+        // Renders the checkbox list inside the dropdown panel, one row per
+        // country with its live node count. Works like the "type" select
+        // visually, but opens a panel so several countries can be checked at once.
+        function chRenderCountryOptions() {
+            const list = document.getElementById('chCountryOptionsList');
+            const countryNames = Object.keys(chCountryMap).sort();
+
+            if (countryNames.length === 0) {
+                list.innerHTML = '<p class="text-gray-400 text-sm p-3">No countries available.</p>';
+                return;
+            }
+
+            list.innerHTML = countryNames.map(country => {
+                const count = chCountryMap[country].length;
+                return \`
+                    <label class="ch-country-option flex items-center justify-between gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50" data-country-name="\${country.toLowerCase()}">
+                        <span class="flex items-center gap-2">
+                            <input type="checkbox" class="ch-country-checkbox" value="\${country}" onchange="chOnCountryToggle()">
+                            <span>\${country}</span>
+                        </span>
+                        <span class="text-gray-400 text-xs">\${count} node\${count > 1 ? 's' : ''}</span>
+                    </label>
+                \`;
+            }).join('');
+        }
+
+        function chFilterCountryOptions() {
+            const query = document.getElementById('chCountrySearch').value.trim().toLowerCase();
+            document.querySelectorAll('.ch-country-option').forEach(row => {
+                const name = row.getAttribute('data-country-name') || '';
+                row.classList.toggle('hidden', query !== '' && !name.includes(query));
+            });
+        }
+
+        function chToggleCountryDropdown() {
+            const panel = document.getElementById('chCountryDropdownPanel');
+            const isHidden = panel.classList.contains('hidden');
+            if (isHidden) {
+                panel.classList.remove('hidden');
+                document.getElementById('chCountrySearch').value = '';
+                chFilterCountryOptions();
+                setTimeout(() => document.getElementById('chCountrySearch').focus(), 0);
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            const panel = document.getElementById('chCountryDropdownPanel');
+            const btn = document.getElementById('chCountryDropdownBtn');
+            if (!panel || panel.classList.contains('hidden')) return;
+            if (!panel.contains(e.target) && !btn.contains(e.target)) {
+                panel.classList.add('hidden');
+            }
+        });
+
+        function chGetSelectedCountries() {
+            return Array.from(document.querySelectorAll('.ch-country-checkbox:checked')).map(cb => cb.value);
+        }
+
+        function chOnCountryToggle() {
+            chUpdateCountryDropdownLabel();
+            chRenderCountryNodeCounts();
+        }
+
+        function chUpdateCountryDropdownLabel() {
+            const label = document.getElementById('chCountryDropdownLabel');
+            const selected = chGetSelectedCountries();
+            if (selected.length === 0) {
+                label.textContent = 'Select countries...';
+                label.className = 'text-gray-500';
+            } else if (selected.length <= 2) {
+                label.textContent = selected.join(', ');
+                label.className = 'text-gray-800';
+            } else {
+                label.textContent = selected.length + ' countries selected';
+                label.className = 'text-gray-800';
+            }
+        }
+
+        // For every currently checked country, show a row with a count select
+        // going from 1 up to that country's own node total (the only number
+        // that ever differs between countries, read straight from check-host.net's data).
+        function chRenderCountryNodeCounts() {
+            const container = document.getElementById('chNodesList');
+            const selectedCountries = chGetSelectedCountries();
+
+            if (selectedCountries.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-sm p-3">Select one or more countries above.</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            selectedCountries.forEach(country => {
+                const ids = chCountryMap[country] || [];
+                const max = ids.length;
+                if (max === 0) return;
+
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between px-3 py-2 text-sm';
+
+                let options = '';
+                for (let i = 1; i <= max; i++) {
+                    options += \`<option value="\${i}">\${i}</option>\`;
+                }
+
+                row.innerHTML = \`
+                    <span>\${country} <span class="text-gray-400 text-xs">(max \${max})</span></span>
+                    <select class="ch-country-count-select border-2 border-gray-200 rounded-lg px-2 py-1 text-sm" data-country="\${country}">
+                        \${options}
+                    </select>
+                \`;
+                container.appendChild(row);
+            });
+        }
+
+        function chResetNodeSelection() {
+            document.querySelectorAll('.ch-country-checkbox').forEach(cb => { cb.checked = false; });
+            chUpdateCountryDropdownLabel();
+            chRenderCountryNodeCounts();
+        }
+
+        // Turns the selected countries + their chosen counts into an explicit
+        // list of node host-ids, taking the first N nodes check-host.net
+        // reported for each selected country.
+        function chGetSelectedNodes() {
+            const selected = [];
+            document.querySelectorAll('.ch-country-count-select').forEach(sel => {
+                const n = parseInt(sel.value, 10) || 0;
+                if (n > 0) {
+                    const country = sel.getAttribute('data-country');
+                    const ids = (chCountryMap[country] || []).slice(0, n);
+                    selected.push(...ids);
+                }
+            });
+            return selected;
+        }
+
+        async function chRunCheck() {
+            const host = document.getElementById('chHostInput').value.trim();
+            const type = document.getElementById('chTypeSelect').value;
+            const maxNodes = document.getElementById('chMaxNodes').value;
+            const selectedNodes = chGetSelectedNodes();
+
+            if (!host) {
+                chShowError('Please enter a host, domain or IP address');
+                return;
+            }
+
+            chShowLoading();
+
+            try {
+                const params = new URLSearchParams();
+                params.set('type', type);
+                params.set('host', host);
+
+                if (selectedNodes.length > 0) {
+                    selectedNodes.forEach(n => params.append('node', n));
+                } else if (maxNodes) {
+                    params.set('max_nodes', maxNodes);
+                }
+
+                const startRes = await fetch('/checkhost/check?' + params.toString());
+                const startData = await startRes.json();
+
+                if (!startRes.ok || !startData.ok) {
+                    throw new Error(startData.message || 'Failed to start check');
+                }
+
+                const requestId = startData.request_id;
+                const nodesInfo = startData.nodes || {};
+
+                let attempts = 0;
+                let resultData = { results: {} };
+
+                while (attempts < 15) {
+                    await new Promise(r => setTimeout(r, 1500));
+                    const resultRes = await fetch('/checkhost/result/' + requestId);
+                    resultData = await resultRes.json();
+
+                    const values = Object.values(resultData.results || {});
+                    const stillPending = values.length === 0 || values.some(v => v === null);
+                    if (!stillPending) break;
+                    attempts++;
+                }
+
+                chDisplayResults(type, nodesInfo, resultData.results || {});
+
+            } catch (error) {
+                console.error('Check-Host error:', error);
+                chShowError(error.message || 'Error running the check. Please try again.');
+            }
+        }
+
+        function chShowLoading() {
+            document.getElementById('chResults').classList.add('hidden');
+            document.getElementById('chError').classList.add('hidden');
+            document.getElementById('chLoading').classList.remove('hidden');
+        }
+
+        function chShowError(message) {
+            document.getElementById('chLoading').classList.add('hidden');
+            document.getElementById('chResults').classList.add('hidden');
+            document.getElementById('chError').classList.remove('hidden');
+            document.getElementById('chErrorMessage').textContent = message;
+        }
+
+        function chDisplayResults(type, nodesInfo, results) {
+            document.getElementById('chLoading').classList.add('hidden');
+            document.getElementById('chError').classList.add('hidden');
+            document.getElementById('chResults').classList.remove('hidden');
+
+            const nodeIds = Object.keys(results);
+            let rows = '';
+
+            nodeIds.forEach(nodeId => {
+                const info = nodesInfo[nodeId] || [];
+                const location = [info[2], info[1]].filter(Boolean).join(', ');
+                rows += \`
+                    <tr class="border-b">
+                        <td class="py-2 px-3 font-medium">\${location || '-'}</td>
+                        <td class="py-2 px-3 text-sm text-gray-500">\${nodeId}</td>
+                        <td class="py-2 px-3">\${chFormatResult(type, results[nodeId])}</td>
+                    </tr>
+                \`;
+            });
+
+            document.getElementById('chResultsTable').innerHTML =
+                rows || '<tr><td colspan="3" class="py-4 text-center text-gray-400">No data returned</td></tr>';
+        }
+
+        function chFormatResult(type, nodeResult) {
+            if (nodeResult === null || nodeResult === undefined) {
+                return '<span class="text-orange-500">Pending / no response</span>';
+            }
+            try {
+                if (type === 'ping') {
+                    const pings = nodeResult[0] || [];
+                    const ok = pings.filter(p => p[0] === 'OK').length;
+                    return \`<span class="\${ok > 0 ? 'text-green-600' : 'text-red-600'}">\${ok}/\${pings.length} OK</span>\`;
+                }
+                if (type === 'http') {
+                    const r = nodeResult[0];
+                    if (!r) return '<span class="text-gray-400">No data</span>';
+                    const status = r[0], time = r[1], msg = r[2], code = r[3];
+                    return status === 1
+                        ? \`<span class="text-green-600">\${code} \${msg} (\${(time * 1000).toFixed(0)}ms)</span>\`
+                        : \`<span class="text-red-600">\${msg || 'Failed'}</span>\`;
+                }
+                if (type === 'tcp') {
+                    const r = nodeResult[0];
+                    if (!r) return '<span class="text-gray-400">No data</span>';
+                    return r.error
+                        ? \`<span class="text-red-600">\${r.error}</span>\`
+                        : \`<span class="text-green-600">Connected (\${(r.time * 1000).toFixed(0)}ms)</span>\`;
+                }
+                if (type === 'udp') {
+                    const r = nodeResult[0];
+                    if (!r) return '<span class="text-gray-400">No data</span>';
+                    return r.error
+                        ? \`<span class="text-orange-600">\${r.error}</span>\`
+                        : \`<span class="text-green-600">Connected (\${((r.time || 0) * 1000).toFixed(0)}ms)</span>\`;
+                }
+                if (type === 'dns') {
+                    const r = nodeResult[0];
+                    if (!r) return '<span class="text-gray-400">No data</span>';
+                    const a = (r.A || []).join(', ') || '-';
+                    const aaaa = (r.AAAA || []).join(', ') || '-';
+                    return \`A: \${a}<br><span class="text-gray-400 text-xs">AAAA: \${aaaa}</span>\`;
+                }
+            } catch (e) {
+                return '<span class="text-gray-400">Parse error</span>';
+            }
+            return JSON.stringify(nodeResult);
         }
     </script>
 </body>
@@ -373,23 +927,39 @@ async function handleRequest(request) {
     const path = url.pathname;
     
     const cleanPath = path.replace(/^\/+|\/+$/g, '');
-    let ip = null;
+
+    // Check-Host section: routed off first, on its own path prefix, so it can never
+    // collide with the Scamalytics IP-based routes below.
+    if (cleanPath === 'checkhost' || cleanPath.startsWith('checkhost/')) {
+        const chSubPath = cleanPath === 'checkhost' ? '' : cleanPath.substring('checkhost/'.length);
+        return chHandleRequest(request, chSubPath);
+    }
+
+    let target = null;
     
     if (cleanPath) {
         if (cleanPath.startsWith('api/')) {
-            ip = cleanPath.substring(4);
+            target = cleanPath.substring(4);
         } else {
-            ip = cleanPath;
+            target = cleanPath;
         }
         
-        if (ip && isValidIP(ip)) {
-            return handleAPIRequest(ip, request);
+        if (target && isValidIP(target)) {
+            return handleAPIRequest(target, request);
+        }
+        if (target && isValidDomain(target)) {
+            return handleDomainRequest(target, request);
         }
     }
     
     const apiParam = url.searchParams.get('api');
     if (apiParam) {
-        return handleAPIRequest(apiParam, request);
+        if (isValidIP(apiParam)) {
+            return handleAPIRequest(apiParam, request);
+        }
+        if (isValidDomain(apiParam)) {
+            return handleDomainRequest(apiParam, request);
+        }
     }
     
     return new Response(HTML_PAGE, {
@@ -427,10 +997,6 @@ async function handleAPIRequest(ip, request) {
     
     try {
         const data = await fetchScamalyticsData(ip);
-        
-const countryCode = data.details['Country Code'] || null;
-        const flagEmoji = getFlagEmoji(countryCode);
-
         const apiResponse = {
             info: {
                 success: true,
@@ -438,24 +1004,7 @@ const countryCode = data.details['Country Code'] || null;
                 fraud_score: data.fraudScore,
                 risk: data.risk
             },
-            details: {
-                country: data.details['Country Name'] || null,
-                country_code: countryCode,
-                flag: flagEmoji,
-                state: data.details['State / Province'] || null,
-                city: data.details['City'] || null,
-                postal_code: data.details['Postal Code'] || null,
-                isp: data.details['ISP Name'] || data.details['ISP'] || null,
-                organization: data.details['Organization Name'] || null,
-                hostname: data.details['Hostname'] || null,
-                asn: data.details['ASN'] || null,
-                datacenter: data.details['Datacenter'] || null,
-                vpn: data.details['Anonymizing VPN'] || null,
-                tor: data.details['Tor Exit Node'] || null,
-                proxy: data.details['Public Proxy'] || null,
-                server: data.details['Server'] || null,
-                web_proxy: data.details['Web Proxy'] || null
-            }
+            details: buildIpDetails(data)
         };
         
         const finalResponse = jsonResponse(apiResponse);
@@ -473,6 +1022,132 @@ const countryCode = data.details['Country Code'] || null;
             ip: ip
         }, 500);
     }
+}
+
+// Shared by both the single-IP path (handleAPIRequest) and the multi-IP domain
+// path (handleDomainRequest) so both return details in the exact same shape.
+function buildIpDetails(data) {
+    const countryCode = data.details['Country Code'] || null;
+    const flagEmoji = getFlagEmoji(countryCode);
+
+    return {
+        country: data.details['Country Name'] || null,
+        country_code: countryCode,
+        flag: flagEmoji,
+        state: data.details['State / Province'] || null,
+        city: data.details['City'] || null,
+        postal_code: data.details['Postal Code'] || null,
+        isp: data.details['ISP Name'] || data.details['ISP'] || null,
+        organization: data.details['Organization Name'] || null,
+        hostname: data.details['Hostname'] || null,
+        asn: data.details['ASN'] || null,
+        datacenter: data.details['Datacenter'] || null,
+        vpn: data.details['Anonymizing VPN'] || null,
+        tor: data.details['Tor Exit Node'] || null,
+        proxy: data.details['Public Proxy'] || null,
+        server: data.details['Server'] || null,
+        web_proxy: data.details['Web Proxy'] || null
+    };
+}
+
+// A domain can sit behind several IPs (load balancers, CDNs, round-robin DNS, ...).
+// This resolves the domain via DNS-over-HTTPS (both A and AAAA records) and runs
+// the exact same Scamalytics lookup used for a single IP against every address found,
+// in parallel. Nothing about the Scamalytics scraping/parsing logic itself changes.
+async function handleDomainRequest(domain, request) {
+    const cacheUrl = new URL(request.url);
+    cacheUrl.pathname = `/domain-cache/${domain}`;
+    cacheUrl.search = '';
+    const cacheKey = new Request(cacheUrl.toString(), { method: 'GET' });
+    const cache = caches.default;
+
+    let cachedResponse = await cache.match(cacheKey);
+    if (cachedResponse) {
+        const responseHeaders = new Headers(cachedResponse.headers);
+        responseHeaders.set('X-Cache', 'HIT');
+        return new Response(cachedResponse.body, {
+            status: cachedResponse.status,
+            headers: responseHeaders
+        });
+    }
+
+    try {
+        const ips = await resolveDomain(domain);
+
+        if (!ips || ips.length === 0) {
+            return jsonResponse({
+                error: true,
+                message: 'Could not resolve this domain to any IPv4/IPv6 address',
+                domain: domain
+            }, 404);
+        }
+
+        // Cap the number of IPs checked per domain to keep a single request bounded.
+        const limitedIps = ips.slice(0, 10);
+
+        const results = await Promise.all(limitedIps.map(async (ip) => {
+            try {
+                const data = await fetchScamalyticsData(ip);
+                return {
+                    ip: data.ip,
+                    fraud_score: data.fraudScore,
+                    risk: data.risk,
+                    details: buildIpDetails(data)
+                };
+            } catch (err) {
+                return {
+                    ip: ip,
+                    error: true,
+                    message: err.message || 'Failed to fetch data for this IP'
+                };
+            }
+        }));
+
+        const apiResponse = {
+            info: {
+                success: true,
+                domain: domain,
+                resolved_count: results.length
+            },
+            results: results
+        };
+
+        const finalResponse = jsonResponse(apiResponse);
+        finalResponse.headers.set('X-Cache', 'MISS');
+        finalResponse.headers.set('Cache-Control', 'public, max-age=3600');
+
+        await cache.put(cacheKey, finalResponse.clone());
+
+        return finalResponse;
+
+    } catch (error) {
+        return jsonResponse({
+            error: true,
+            message: error.message || 'Failed to resolve domain',
+            domain: domain
+        }, 500);
+    }
+}
+
+// Resolves a domain to its IPv4 (A) and IPv6 (AAAA) addresses using Cloudflare's
+// own DNS-over-HTTPS resolver — no extra dependency, no extra third-party service.
+async function resolveDomain(domain) {
+    const doh = (type) => fetch(
+        `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=${type}`,
+        { headers: { 'Accept': 'application/dns-json' } }
+    ).then(res => res.ok ? res.json() : { Answer: [] }).catch(() => ({ Answer: [] }));
+
+    const [aData, aaaaData] = await Promise.all([doh('A'), doh('AAAA')]);
+
+    const ips = [];
+    (aData.Answer || []).forEach(record => {
+        if (record.type === 1 && isValidIP(record.data)) ips.push(record.data);
+    });
+    (aaaaData.Answer || []).forEach(record => {
+        if (record.type === 28 && isValidIP(record.data)) ips.push(record.data);
+    });
+
+    return [...new Set(ips)];
 }
 
 async function fetchScamalyticsData(ip) {
@@ -644,15 +1319,29 @@ function parseScamalyticsHTML(html, ip) {
 }
 
 function isValidIP(ip) {
+    return isValidIPv4(ip) || isValidIPv6(ip);
+}
+
+function isValidIPv4(ip) {
     const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-    const ipv6Regex = /^([0-9a-fA-F]{0,4}:){7}[0-9a-fA-F]{0,4}$/;
-    
-    if (ipv4Regex.test(ip)) {
-        const parts = ip.split('.');
-        return parts.every(part => parseInt(part) >= 0 && parseInt(part) <= 255);
-    }
-    
+    if (!ipv4Regex.test(ip)) return false;
+    return ip.split('.').every(part => parseInt(part, 10) >= 0 && parseInt(part, 10) <= 255);
+}
+
+// Handles full-form, zero-compressed ("::") and IPv4-mapped IPv6 addresses —
+// the earlier regex only matched the full 8-group form and rejected almost
+// every real-world IPv6 address (e.g. 2001:4860:4860::8888).
+function isValidIPv6(ip) {
+    const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))$/;
     return ipv6Regex.test(ip);
+}
+
+// Basic hostname validation: labels of 1-63 chars (letters/digits/hyphens,
+// no leading/trailing hyphen), at least one dot, TLD of 2+ letters.
+function isValidDomain(domain) {
+    if (!domain || domain.length > 253) return false;
+    const domainRegex = /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,}$/;
+    return domainRegex.test(domain);
 }
 
 function getFlagEmoji(countryCode) {
@@ -679,6 +1368,327 @@ function getRandomUserAgent() {
 }
 
 function jsonResponse(data, status = 200) {
+    return new Response(JSON.stringify(data, null, 2), {
+        status: status,
+        headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        }
+    });
+}
+
+// =====================================================================================
+// Check-Host Section (backend) — fully isolated from Scamalytics section above.
+// - Own route prefix: /checkhost/*
+// - Own cache key namespace: "checkhost-nodes" (distinct from the Scamalytics "/api-cache/*" keys)
+// - Own response helper: chJsonResponse (kept separate from jsonResponse on purpose,
+//   even though currently identical, so future changes to one never leak into the other)
+// - Talks only to check-host.net's official public JSON API — no HTML scraping,
+//   no third-party CORS proxies, no shared state with the Scamalytics fetch logic.
+// =====================================================================================
+
+const CH_ALLOWED_TYPES = ['ping', 'http', 'tcp', 'udp', 'dns'];
+const CH_API_BASE = 'https://check-host.net';
+
+async function chHandleRequest(request, chSubPath) {
+    if (chSubPath === '' || chSubPath === 'nodes') {
+        return chHandleNodesRequest();
+    }
+    if (chSubPath === 'check') {
+        return chHandleCheckRequest(request);
+    }
+    if (chSubPath.startsWith('result/')) {
+        const requestId = chSubPath.substring('result/'.length);
+        return chHandleResultRequest(requestId, request);
+    }
+    return chJsonResponse({ ok: false, message: 'Unknown Check-Host endpoint' }, 404);
+}
+
+// check-host.net reports nodes as a flat map of hostId -> [countryCode, countryName, city, ip, asn].
+// This turns that into a stable object shape, used by every endpoint that returns node info
+// (nodes list, check-start response) so the frontend only ever deals with one shape.
+function chNormalizeNodesMap(rawMap) {
+    const nodes = {};
+    if (!rawMap || typeof rawMap !== 'object') return nodes;
+
+    Object.keys(rawMap).forEach(hostId => {
+        const entry = rawMap[hostId];
+        if (Array.isArray(entry)) {
+            nodes[hostId] = {
+                country_code: entry[0] || null,
+                country: entry[1] || null,
+                city: entry[2] || null,
+                ip: entry[3] || null,
+                asn: entry[4] || null
+            };
+        } else if (entry && typeof entry === 'object') {
+            nodes[hostId] = {
+                country_code: entry.country_code || null,
+                country: entry.country || null,
+                city: entry.city || null,
+                ip: entry.ip || null,
+                asn: entry.asn || null
+            };
+        }
+    });
+
+    return nodes;
+}
+
+// GET /checkhost/nodes -> normalized + cached list of available check-host.net nodes.
+async function chHandleNodesRequest() {
+    const cacheKey = new Request('https://cache.internal/checkhost-nodes-v2', { method: 'GET' });
+    const cache = caches.default;
+
+    const cached = await cache.match(cacheKey);
+    if (cached) {
+        const headers = new Headers(cached.headers);
+        headers.set('X-Cache', 'HIT');
+        return new Response(cached.body, { status: cached.status, headers });
+    }
+
+    try {
+        const res = await fetch(`${CH_API_BASE}/nodes/hosts`, {
+            headers: {
+                'Accept': 'application/json',
+                'User-Agent': getRandomUserAgent()
+            }
+        });
+
+        if (!res.ok) {
+            throw new Error(`Upstream returned HTTP ${res.status}`);
+        }
+
+        const raw = await res.json();
+        const rawMap = (raw && typeof raw === 'object' && raw.nodes) ? raw.nodes : raw;
+
+        if (!rawMap || typeof rawMap !== 'object' || Array.isArray(rawMap)) {
+            throw new Error('Unexpected response shape from check-host.net');
+        }
+
+        const nodes = chNormalizeNodesMap(rawMap);
+
+        if (Object.keys(nodes).length === 0) {
+            throw new Error('Node list from check-host.net was empty after parsing');
+        }
+
+        const response = chJsonResponse({ ok: true, nodes });
+        response.headers.set('X-Cache', 'MISS');
+        response.headers.set('Cache-Control', 'public, max-age=3600');
+
+        await cache.put(cacheKey, response.clone());
+        return response;
+    } catch (e) {
+        return chJsonResponse({
+            ok: false,
+            message: 'Failed to fetch Check-Host node list: ' + (e.message || 'unknown error')
+        }, 502);
+    }
+}
+
+// GET /checkhost/check?type=<ping|http|tcp|udp|dns>&host=<host>&node=<id>&node=<id>&max_nodes=<n>
+// Starts a check on check-host.net and returns a normalized shape:
+// { ok, request_id, permanent_link, nodes: { hostId: {country, city, ip, asn, ...} } }
+async function chHandleCheckRequest(request) {
+    const url = new URL(request.url);
+    const type = url.searchParams.get('type');
+    const host = url.searchParams.get('host');
+    const maxNodes = url.searchParams.get('max_nodes');
+    const nodes = url.searchParams.getAll('node');
+
+    if (!type || !CH_ALLOWED_TYPES.includes(type)) {
+        return chJsonResponse({ ok: false, message: 'Invalid or missing "type" parameter. Allowed: ' + CH_ALLOWED_TYPES.join(', ') }, 400);
+    }
+    if (!host) {
+        return chJsonResponse({ ok: false, message: 'Missing "host" parameter' }, 400);
+    }
+
+    const upstream = new URL(`${CH_API_BASE}/check-${type}`);
+    upstream.searchParams.set('host', host);
+
+    if (nodes.length > 0) {
+        nodes.forEach(n => upstream.searchParams.append('node', n));
+    } else {
+        const safeMaxNodes = Math.min(Math.max(parseInt(maxNodes, 10) || 3, 1), 10);
+        upstream.searchParams.set('max_nodes', String(safeMaxNodes));
+    }
+
+    try {
+        const res = await fetch(upstream.toString(), {
+            headers: { 'Accept': 'application/json', 'User-Agent': getRandomUserAgent() }
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+            const message = Array.isArray(data.error) ? data.error.join(', ') : (data.error || `Upstream returned HTTP ${res.status}`);
+            return chJsonResponse({ ok: false, message }, res.ok ? 400 : 502);
+        }
+
+        return chJsonResponse({
+            ok: true,
+            request_id: data.request_id || null,
+            permanent_link: data.permanent_link || null,
+            nodes: chNormalizeNodesMap(data.nodes || {})
+        });
+    } catch (e) {
+        return chJsonResponse({ ok: false, message: 'Failed to start Check-Host check: ' + (e.message || 'unknown error') }, 502);
+    }
+}
+
+// GET /checkhost/result/<request_id>?type=<ping|http|tcp|udp|dns>
+// Returns { ok, finished, results: { hostId: NormalizedResult } } where every check
+// type is flattened into the same { status, message, time_ms, ...extra } shape,
+// so the frontend never has to branch on check-host.net's raw per-type formats.
+async function chHandleResultRequest(requestId, request) {
+    if (!requestId || !/^[a-zA-Z0-9]+$/.test(requestId)) {
+        return chJsonResponse({ ok: false, message: 'Invalid request id' }, 400);
+    }
+
+    const url = new URL(request.url);
+    const type = url.searchParams.get('type');
+    if (!type || !CH_ALLOWED_TYPES.includes(type)) {
+        return chJsonResponse({ ok: false, message: 'Invalid or missing "type" parameter. Allowed: ' + CH_ALLOWED_TYPES.join(', ') }, 400);
+    }
+
+    try {
+        const res = await fetch(`${CH_API_BASE}/check-result-extended/${requestId}`, {
+            headers: { 'Accept': 'application/json', 'User-Agent': getRandomUserAgent() }
+        });
+
+        if (!res.ok) {
+            throw new Error(`Upstream returned HTTP ${res.status}`);
+        }
+
+        const raw = await res.json();
+        const results = {};
+        let finished = true;
+
+        Object.keys(raw || {}).forEach(hostId => {
+            const normalized = chNormalizeNodeResult(type, raw[hostId]);
+            if (normalized.status === 'pending') finished = false;
+            results[hostId] = normalized;
+        });
+
+        return chJsonResponse({ ok: true, finished, results });
+    } catch (e) {
+        return chJsonResponse({ ok: false, message: 'Failed to fetch Check-Host result: ' + (e.message || 'unknown error') }, 502);
+    }
+}
+
+function chNormalizeNodeResult(type, nodeData) {
+    if (nodeData === null || nodeData === undefined) {
+        return { status: 'pending', message: 'Waiting for this node to report', time_ms: null };
+    }
+    try {
+        switch (type) {
+            case 'ping': return chNormalizePingResult(nodeData);
+            case 'http': return chNormalizeHttpResult(nodeData);
+            case 'tcp': return chNormalizeTcpResult(nodeData);
+            case 'udp': return chNormalizeUdpResult(nodeData);
+            case 'dns': return chNormalizeDnsResult(nodeData);
+            default: return { status: 'unknown', message: 'Unrecognized check type', time_ms: null };
+        }
+    } catch (e) {
+        return { status: 'error', message: 'Failed to parse result: ' + (e.message || 'unknown error'), time_ms: null };
+    }
+}
+
+// Raw shape: [[ [status, time_seconds, ip], ... ]] — one array of ping attempts per node.
+function chNormalizePingResult(nodeData) {
+    const attemptsRaw = Array.isArray(nodeData[0]) ? nodeData[0] : [];
+    const attempts = attemptsRaw.map(a => {
+        const ok = a && a[0] === 'OK';
+        return {
+            status: ok ? 'ok' : 'timeout',
+            time_ms: (ok && typeof a[1] === 'number') ? Math.round(a[1] * 1000) : null,
+            ip: (a && a[2]) || null
+        };
+    });
+
+    const okAttempts = attempts.filter(a => a.status === 'ok');
+    const total = attempts.length;
+
+    let status = 'failed';
+    if (total > 0 && okAttempts.length === total) status = 'ok';
+    else if (okAttempts.length > 0) status = 'partial';
+
+    const avgTime = okAttempts.length
+        ? Math.round(okAttempts.reduce((sum, a) => sum + a.time_ms, 0) / okAttempts.length)
+        : null;
+
+    return {
+        status,
+        message: total > 0 ? `${okAttempts.length}/${total} replies received` : 'No response',
+        time_ms: avgTime,
+        attempts
+    };
+}
+
+// Raw shape: [[ok_flag(0|1), time_seconds, message, http_code, ip]]
+function chNormalizeHttpResult(nodeData) {
+    const r = nodeData[0];
+    if (!r) return { status: 'failed', message: 'No data returned', time_ms: null };
+
+    const ok = r[0] === 1;
+    return {
+        status: ok ? 'ok' : 'failed',
+        message: r[2] || (ok ? 'OK' : 'Request failed'),
+        time_ms: typeof r[1] === 'number' ? Math.round(r[1] * 1000) : null,
+        http_code: (r[3] !== undefined && r[3] !== null) ? r[3] : null,
+        ip: r[4] || null
+    };
+}
+
+// Raw shape: [{ address, port, time }] on success, or [{ error }] on failure.
+function chNormalizeTcpResult(nodeData) {
+    const r = nodeData[0];
+    if (!r) return { status: 'failed', message: 'No data returned', time_ms: null };
+    if (r.error) return { status: 'failed', message: r.error, time_ms: null };
+
+    return {
+        status: 'ok',
+        message: 'Connected',
+        time_ms: typeof r.time === 'number' ? Math.round(r.time * 1000) : null,
+        ip: r.address || null,
+        port: r.port || null
+    };
+}
+
+// Raw shape: [{ time, ... }] on success, or [{ error }] on failure.
+function chNormalizeUdpResult(nodeData) {
+    const r = nodeData[0];
+    if (!r) return { status: 'failed', message: 'No data returned', time_ms: null };
+    if (r.error) return { status: 'failed', message: r.error, time_ms: null };
+
+    return {
+        status: 'ok',
+        message: 'Response received',
+        time_ms: typeof r.time === 'number' ? Math.round(r.time * 1000) : null
+    };
+}
+
+// Raw shape: [{ A: [...], AAAA: [...], NS: [...], MX: [...], TXT: [...], CNAME: [...] }]
+function chNormalizeDnsResult(nodeData) {
+    const r = nodeData[0];
+    if (!r) return { status: 'failed', message: 'No data returned', time_ms: null, records: {} };
+
+    const records = {};
+    ['A', 'AAAA', 'NS', 'MX', 'TXT', 'CNAME', 'SOA'].forEach(key => {
+        if (r[key] && r[key].length) records[key] = r[key];
+    });
+
+    const hasAny = Object.keys(records).length > 0;
+    return {
+        status: hasAny ? 'ok' : 'failed',
+        message: hasAny ? 'Records resolved' : 'No records found',
+        time_ms: null,
+        records
+    };
+}
+
+function chJsonResponse(data, status = 200) {
     return new Response(JSON.stringify(data, null, 2), {
         status: status,
         headers: {
