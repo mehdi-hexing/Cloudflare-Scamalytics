@@ -3,7 +3,7 @@ const HTML_PAGE = `
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Scamalytics IP Checker - API & Fraud Risk Score Analysis</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -11,6 +11,8 @@ const HTML_PAGE = `
         
         body {
             font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            width: 100%;
         }
         
         .risk-low {
@@ -54,18 +56,18 @@ const HTML_PAGE = `
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
-    <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-gray-800 mb-2">Scamalytics IP Checker</h1>
-            <p class="text-gray-600">Check IP Fraud Risk & Score Analysis</p>
+    <div class="w-full max-w-4xl mx-auto px-3 sm:px-4 py-6 sm:py-8 box-border">
+        <div class="text-center mb-6 sm:mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-2">Scamalytics IP Checker</h1>
+            <p class="text-sm sm:text-base text-gray-600">Check IP Fraud Risk & Score Analysis</p>
         </div>
 
         <div class="mb-6">
-            <div class="flex gap-2 bg-white rounded-xl shadow-lg p-2">
-                <button id="tabScamalyticsBtn" onclick="switchTab('scamalytics')" class="flex-1 py-2 px-4 rounded-lg font-semibold transition-colors bg-blue-600 text-white">
+            <div class="flex gap-2 bg-white rounded-xl shadow-lg p-1.5 sm:p-2">
+                <button id="tabScamalyticsBtn" onclick="switchTab('scamalytics')" class="flex-1 py-2 px-2 sm:px-4 text-xs sm:text-sm md:text-base rounded-lg font-semibold transition-colors bg-blue-600 text-white">
                     Scamalytics IP Check
                 </button>
-                <button id="tabCheckhostBtn" onclick="switchTab('checkhost')" class="flex-1 py-2 px-4 rounded-lg font-semibold transition-colors text-gray-600 hover:bg-gray-100">
+                <button id="tabCheckhostBtn" onclick="switchTab('checkhost')" class="flex-1 py-2 px-2 sm:px-4 text-xs sm:text-sm md:text-base rounded-lg font-semibold transition-colors text-gray-600 hover:bg-gray-100">
                     Check-Host Network Test
                 </button>
             </div>
@@ -73,96 +75,96 @@ const HTML_PAGE = `
 
         <div id="scamalyticsPanel">
 
-        <div class="bg-white rounded-2xl shadow-xl p-6 mb-8">
-            <div class="flex flex-col sm:flex-row gap-4">
+        <div class="bg-white rounded-2xl shadow-xl p-4 sm:p-6 mb-6 sm:mb-8">
+            <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <input 
                     type="text" 
                     id="ipInput" 
-                    placeholder="Enter IP (IPv4/IPv6) or domain, e.g. 8.8.8.8, 2001:4860:4860::8888, example.com"
-                    class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
+                    placeholder="Enter IP or domain, e.g. 8.8.8.8, example.com"
+                    class="w-full flex-1 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
                 />
                 <button 
                     onclick="checkIP()" 
                     id="checkBtn"
-                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition-all transform hover:scale-105 active:scale-95">
+                    class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg transition-all text-sm sm:text-base transform active:scale-95">
                     Check
                 </button>
             </div>
-            <p class="text-sm text-gray-500 mt-3">You can also use URL parameter: ?ip=8.8.8.8</p>
-            <p class="text-sm text-blue-600 mt-2">API Endpoints: <code class="bg-gray-100 px-2 py-1 rounded">/8.8.8.8</code>, <code class="bg-gray-100 px-2 py-1 rounded">/api/example.com</code> (IPv4, IPv6 and domains are all supported â€” a domain is resolved and every IP behind it is checked)</p>
+            <p class="text-xs sm:text-sm text-gray-500 mt-3">You can also use URL parameter: ?ip=8.8.8.8</p>
+            <p class="text-xs sm:text-sm text-blue-600 mt-2 break-words">API Endpoints: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/8.8.8.8</code>, <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/api/example.com</code></p>
         </div>
 
         <div id="loading" class="hidden text-center py-12">
             <div class="loading mx-auto mb-4"></div>
-            <p class="text-gray-600">Fetching data...</p>
+            <p class="text-gray-600 text-sm sm:text-base">Fetching data...</p>
         </div>
 
-        <div id="error" class="hidden bg-red-50 border-2 border-red-200 rounded-2xl p-6 mb-8 fade-in">
+        <div id="error" class="hidden bg-red-50 border-2 border-red-200 rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8 fade-in">
             <div class="flex items-center gap-3">
-                <span class="text-3xl">âš ï¸</span>
-                <div>
-                    <h3 class="font-bold text-red-800">Error Fetching Data</h3>
-                    <p id="errorMessage" class="text-red-600"></p>
+                <span class="text-2xl sm:text-3xl">&#9888;&#65039;</span>
+                <div class="break-words flex-1">
+                    <h3 class="font-bold text-red-800 text-sm sm:text-base">Error Fetching Data</h3>
+                    <p id="errorMessage" class="text-red-600 text-xs sm:text-sm mt-1"></p>
                 </div>
             </div>
         </div>
 
         <div id="results" class="hidden fade-in">
-            <div id="scoreCard" class="rounded-2xl shadow-xl p-8 mb-6 text-white">
+            <div id="scoreCard" class="rounded-2xl shadow-xl p-6 sm:p-8 mb-6 text-white">
                 <div class="text-center">
-                    <h2 class="text-xl font-semibold mb-2">Fraud Score</h2>
-                    <div class="text-7xl font-bold mb-2" id="fraudScore">-</div>
-                    <div class="text-2xl font-semibold" id="riskLevel">-</div>
+                    <h2 class="text-lg sm:text-xl font-semibold mb-2">Fraud Score</h2>
+                    <div class="text-6xl sm:text-7xl font-bold mb-2" id="fraudScore">-</div>
+                    <div class="text-xl sm:text-2xl font-semibold" id="riskLevel">-</div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <h3 class="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2">
-                        <span>ðŸŒ</span> IP Information
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6">
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                    <h3 class="font-bold text-base sm:text-lg mb-4 text-gray-800 flex items-center gap-2">
+                        <span>&#127760;</span> IP Information
                     </h3>
-                    <div class="space-y-3">
+                    <div class="space-y-3 text-sm sm:text-base">
                         <div class="flex justify-between border-b pb-2">
                             <span class="text-gray-600">IP Address:</span>
-                            <span class="font-semibold" id="ipAddress">-</span>
+                            <span class="font-semibold break-all text-right" id="ipAddress">-</span>
                         </div>
                         <div class="flex justify-between border-b pb-2">
                             <span class="text-gray-600">Country:</span>
-                            <span class="font-semibold" id="country">-</span>
+                            <span class="font-semibold text-right" id="country">-</span>
                         </div>
                         <div class="flex justify-between border-b pb-2">
                             <span class="text-gray-600">City:</span>
-                            <span class="font-semibold" id="city">-</span>
+                            <span class="font-semibold text-right" id="city">-</span>
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">ISP:</span>
-                            <span class="font-semibold text-sm" id="isp">-</span>
+                        <div class="flex justify-between items-start gap-2">
+                            <span class="text-gray-600 shrink-0">ISP:</span>
+                            <span class="font-semibold text-xs sm:text-sm text-right break-words" id="isp">-</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <h3 class="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2">
-                        <span>âš¡</span> Risk Factors
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                    <h3 class="font-bold text-base sm:text-lg mb-4 text-gray-800 flex items-center gap-2">
+                        <span>&#9889;</span> Risk Factors
                     </h3>
-                    <div class="space-y-3" id="riskFactors">
+                    <div class="space-y-3 text-sm sm:text-base" id="riskFactors">
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-lg p-6">
-                <h3 class="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2">
-                    <span>ðŸ“Š</span> Additional Information
+            <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                <h3 class="font-bold text-base sm:text-lg mb-4 text-gray-800 flex items-center gap-2">
+                    <span>&#128202;</span> Additional Information
                 </h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4" id="additionalInfo">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4" id="additionalInfo">
                 </div>
             </div>
         </div>
 
         <div id="domainResults" class="hidden fade-in">
-            <div class="bg-white rounded-2xl shadow-xl p-6 mb-4">
-                <h2 class="text-xl font-bold text-gray-800 mb-1">Domain: <span id="domainName" class="text-blue-600"></span></h2>
-                <p class="text-sm text-gray-500"><span id="domainIpCount">0</span> IP address(es) resolved. Each one is checked separately below.</p>
+            <div class="bg-white rounded-2xl shadow-xl p-4 sm:p-6 mb-4">
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800 mb-1">Domain: <span id="domainName" class="text-blue-600 break-all"></span></h2>
+                <p class="text-xs sm:text-sm text-gray-500"><span id="domainIpCount">0</span> IP address(es) resolved. Each one is checked separately below.</p>
             </div>
             <div id="domainResultsList" class="space-y-4"></div>
         </div>
@@ -171,15 +173,15 @@ const HTML_PAGE = `
 
         <div id="checkhostPanel" class="hidden">
 
-            <div class="bg-white rounded-2xl shadow-xl p-6 mb-8">
-                <div class="flex flex-col sm:flex-row gap-4 mb-4">
+            <div class="bg-white rounded-2xl shadow-xl p-4 sm:p-6 mb-6 sm:mb-8">
+                <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4">
                     <input
                         type="text"
                         id="chHostInput"
-                        placeholder="Host, domain or IP (e.g. example.com or smtp://gmail.com)"
-                        class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
+                        placeholder="Host, domain or IP (e.g. example.com)"
+                        class="w-full flex-1 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
                     />
-                    <select id="chTypeSelect" class="px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500">
+                    <select id="chTypeSelect" class="w-full sm:w-auto px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 bg-white">
                         <option value="ping">Ping</option>
                         <option value="http">HTTP</option>
                         <option value="tcp">TCP</option>
@@ -189,78 +191,69 @@ const HTML_PAGE = `
                     <button
                         onclick="chRunCheck()"
                         id="chCheckBtn"
-                        class="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-8 py-3 rounded-lg transition-all transform hover:scale-105 active:scale-95">
+                        class="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg transition-all text-sm sm:text-base transform active:scale-95">
                         Run Check
                     </button>
                 </div>
 
-                <div class="flex items-center gap-4 mb-3">
-                    <label class="text-sm text-gray-600">Fallback max nodes (used only if no country below has a node count selected):</label>
-                    <input type="number" id="chMaxNodes" value="3" min="1" max="10" class="w-20 px-2 py-1 border-2 border-gray-300 rounded-lg text-sm">
+                <div class="flex flex-wrap items-center gap-2 sm:gap-4 mb-4 pb-3 border-b">
+                    <label class="text-xs sm:text-sm text-gray-600">Fallback max nodes (if no country selected):</label>
+                    <input type="number" id="chMaxNodes" value="3" min="1" max="10" class="w-16 sm:w-20 px-2 py-1 border-2 border-gray-300 rounded-lg text-xs sm:text-sm">
                 </div>
 
-                <div class="border-t pt-4">
+                <div class="pt-2">
                     <div class="flex justify-between items-center mb-2">
-                        <h3 class="font-semibold text-gray-700">Countries</h3>
-                        <button onclick="chResetNodeSelection()" class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg">Reset</button>
+                        <h3 class="font-semibold text-sm sm:text-base text-gray-700">Filter by Countries</h3>
+                        <button onclick="chResetNodeSelection()" class="text-xs px-2.5 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600">Reset</button>
                     </div>
-                    <p class="text-xs text-gray-400 mb-2">The country list, and how many nodes exist in each one, come directly from check-host.net's own node list â€” the worker just relays it.</p>
+                    <p class="text-xs text-gray-400 mb-3">Nodes are queried directly from check-host.net.</p>
 
-                    <div class="relative mb-3">
+                    <div class="relative mb-4">
                         <button
                             type="button"
                             id="chCountryDropdownBtn"
                             onclick="chToggleCountryDropdown()"
-                            class="w-full flex justify-between items-center px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors bg-white text-left">
-                            <span id="chCountryDropdownLabel" class="text-gray-500">Loading countries...</span>
-                            <span class="text-gray-400">&#9662;</span>
+                            class="w-full flex justify-between items-center px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors bg-white text-left">
+                            <span id="chCountryDropdownLabel" class="text-gray-500 truncate mr-2">Loading countries...</span>
+                            <span class="text-gray-400 shrink-0">&#9662;</span>
                         </button>
-                        <div id="chCountryDropdownPanel" class="hidden absolute left-0 right-0 mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg z-20">
+                        <div id="chCountryDropdownPanel" class="hidden absolute left-0 right-0 mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-xl z-30 max-w-full">
                             <input
                                 type="text"
                                 id="chCountrySearch"
                                 placeholder="Search countries..."
                                 oninput="chFilterCountryOptions()"
-                                class="w-full px-3 py-2 border-b-2 border-gray-200 rounded-t-lg focus:outline-none text-sm" />
-                            <div id="chCountryOptionsList" class="max-h-56 overflow-y-auto"></div>
+                                class="w-full px-3 py-2 border-b-2 border-gray-200 rounded-t-lg focus:outline-none text-xs sm:text-sm" />
+                            <div id="chCountryOptionsList" class="max-h-48 sm:max-h-56 overflow-y-auto"></div>
                         </div>
                     </div>
 
-                    <h4 class="text-sm font-semibold text-gray-700 mb-2">Nodes to use per selected country</h4>
-                    <div id="chNodesList" class="divide-y max-h-56 overflow-y-auto border rounded-lg">
-                        <p class="text-gray-400 text-sm p-3">Select one or more countries above.</p>
+                    <h4 class="text-xs sm:text-sm font-semibold text-gray-700 mb-2">Nodes per selected country</h4>
+                    <div id="chNodesList" class="divide-y max-h-48 sm:max-h-56 overflow-y-auto border rounded-lg bg-gray-50/50">
+                        <p class="text-gray-400 text-xs sm:text-sm p-3">Select one or more countries above.</p>
                     </div>
                 </div>
             </div>
 
             <div id="chLoading" class="hidden text-center py-12">
                 <div class="loading mx-auto mb-4"></div>
-                <p class="text-gray-600">Running check across nodes...</p>
+                <p class="text-gray-600 text-sm sm:text-base">Running check across nodes...</p>
             </div>
 
-            <div id="chError" class="hidden bg-red-50 border-2 border-red-200 rounded-2xl p-6 mb-8 fade-in">
+            <div id="chError" class="hidden bg-red-50 border-2 border-red-200 rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8 fade-in">
                 <div class="flex items-center gap-3">
-                    <span class="text-3xl">âš ï¸</span>
-                    <div>
-                        <h3 class="font-bold text-red-800">Error Running Check</h3>
-                        <p id="chErrorMessage" class="text-red-600"></p>
+                    <span class="text-2xl sm:text-3xl">&#9888;&#65039;</span>
+                    <div class="break-words flex-1">
+                        <h3 class="font-bold text-red-800 text-sm sm:text-base">Error Running Check</h3>
+                        <p id="chErrorMessage" class="text-red-600 text-xs sm:text-sm mt-1"></p>
                     </div>
                 </div>
             </div>
 
-            <div id="chResults" class="hidden fade-in bg-white rounded-2xl shadow-xl p-6">
-                <h3 class="font-bold text-lg mb-4 text-gray-800">Results</h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left">
-                        <thead>
-                            <tr class="border-b-2">
-                                <th class="py-2 px-3">Location</th>
-                                <th class="py-2 px-3">Node</th>
-                                <th class="py-2 px-3">Result</th>
-                            </tr>
-                        </thead>
-                        <tbody id="chResultsTable"></tbody>
-                    </table>
+            <div id="chResults" class="hidden fade-in bg-white rounded-2xl shadow-xl p-4 sm:p-6">
+                <h3 class="font-bold text-base sm:text-lg mb-4 text-gray-800">Results</h3>
+                <div class="w-full overflow-hidden">
+                    <div id="chResultsList" class="space-y-3"></div>
                 </div>
             </div>
 
@@ -371,13 +364,13 @@ const HTML_PAGE = `
 
             const scoreCard = document.getElementById('scoreCard');
             if (data.fraudScore <= 25) {
-                scoreCard.className = 'rounded-2xl shadow-xl p-8 mb-6 text-white risk-low';
+                scoreCard.className = 'rounded-2xl shadow-xl p-6 sm:p-8 mb-6 text-white risk-low';
             } else if (data.fraudScore <= 50) {
-                scoreCard.className = 'rounded-2xl shadow-xl p-8 mb-6 text-white risk-medium';
+                scoreCard.className = 'rounded-2xl shadow-xl p-6 sm:p-8 mb-6 text-white risk-medium';
             } else if (data.fraudScore <= 75) {
-                scoreCard.className = 'rounded-2xl shadow-xl p-8 mb-6 text-white risk-high';
+                scoreCard.className = 'rounded-2xl shadow-xl p-6 sm:p-8 mb-6 text-white risk-high';
             } else {
-                scoreCard.className = 'rounded-2xl shadow-xl p-8 mb-6 text-white risk-very-high';
+                scoreCard.className = 'rounded-2xl shadow-xl p-6 sm:p-8 mb-6 text-white risk-very-high';
             }
 
             document.getElementById('fraudScore').textContent = data.fraudScore;
@@ -392,12 +385,12 @@ const HTML_PAGE = `
             riskFactorsDiv.innerHTML = '';
             
             const factorsToShow = [
-                { key: 'Anonymizing VPN', icon: 'ðŸ”’' },
-                { key: 'Tor Exit Node', icon: 'ðŸ§…' },
-                { key: 'Server', icon: 'ðŸ–¥ï¸' },
-                { key: 'Public Proxy', icon: 'ðŸŒ' },
-                { key: 'Web Proxy', icon: 'ðŸ”„' },
-                { key: 'Datacenter', icon: 'ðŸ¢' }
+                { key: 'Anonymizing VPN', icon: '&#128274;' },
+                { key: 'Tor Exit Node', icon: '&#129437;' },
+                { key: 'Server', icon: '&#128421;&#65039;' },
+                { key: 'Public Proxy', icon: '&#127760;' },
+                { key: 'Web Proxy', icon: '&#128257;' },
+                { key: 'Datacenter', icon: '&#127970;' }
             ];
 
             factorsToShow.forEach(factor => {
@@ -406,8 +399,8 @@ const HTML_PAGE = `
                 const isUnknown = value.toLowerCase() === 'unknown';
                 riskFactorsDiv.innerHTML += \`
                     <div class="flex justify-between items-center border-b pb-2">
-                        <span class="text-gray-600">\${factor.icon} \${factor.key}:</span>
-                        <span class="font-semibold \${isYes ? 'text-red-600' : isUnknown ? 'text-orange-600' : 'text-green-600'}">
+                        <span class="text-gray-600 text-xs sm:text-sm">\${factor.icon} \${factor.key}:</span>
+                        <span class="font-semibold text-xs sm:text-sm \${isYes ? 'text-red-600' : isUnknown ? 'text-orange-600' : 'text-green-600'}">
                             \${value}
                         </span>
                     </div>
@@ -429,9 +422,9 @@ const HTML_PAGE = `
             additionalFields.forEach(field => {
                 if (data.details[field] && data.details[field] !== '-') {
                     additionalInfoDiv.innerHTML += \`
-                        <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="bg-gray-50 rounded-lg p-2.5 sm:p-3">
                             <div class="text-xs text-gray-500 mb-1">\${field}</div>
-                            <div class="font-semibold text-gray-800">\${data.details[field]}</div>
+                            <div class="font-semibold text-gray-800 text-xs sm:text-sm break-words">\${data.details[field]}</div>
                         </div>
                     \`;
                 }
@@ -453,9 +446,9 @@ const HTML_PAGE = `
             results.forEach(item => {
                 if (item.error) {
                     listDiv.innerHTML += \`
-                        <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4">
-                            <p class="font-semibold text-red-700">\${item.ip || 'Unknown IP'}</p>
-                            <p class="text-sm text-red-500">\${item.message || 'Failed to fetch data for this IP'}</p>
+                        <div class="bg-red-50 border-2 border-red-200 rounded-xl p-3 sm:p-4">
+                            <p class="font-semibold text-red-700 text-sm break-all">\${item.ip || 'Unknown IP'}</p>
+                            <p class="text-xs text-red-500 mt-1">\${item.message || 'Failed to fetch data for this IP'}</p>
                         </div>
                     \`;
                     return;
@@ -472,16 +465,16 @@ const HTML_PAGE = `
                 const isp = details.isp || details.organization || '-';
 
                 listDiv.innerHTML += \`
-                    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
                         <div class="flex flex-col sm:flex-row">
-                            <div class="\${riskClass} text-white p-4 sm:w-40 flex flex-col items-center justify-center text-center">
-                                <div class="text-3xl font-bold">\${score}</div>
-                                <div class="text-xs">\${translateRiskFromEnglish(item.risk)}</div>
+                            <div class="\${riskClass} text-white p-3 sm:p-4 sm:w-36 flex flex-col items-center justify-center text-center">
+                                <div class="text-2xl sm:text-3xl font-bold">\${score}</div>
+                                <div class="text-xs opacity-90">\${translateRiskFromEnglish(item.risk)}</div>
                             </div>
-                            <div class="p-4 flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-                                <div><span class="text-gray-500">IP:</span> <span class="font-semibold">\${item.ip}</span></div>
-                                <div><span class="text-gray-500">Country:</span> <span class="font-semibold">\${country}</span></div>
-                                <div><span class="text-gray-500">ISP:</span> <span class="font-semibold">\${isp}</span></div>
+                            <div class="p-3 sm:p-4 flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs sm:text-sm">
+                                <div class="break-all"><span class="text-gray-500">IP:</span> <span class="font-semibold">\${item.ip}</span></div>
+                                <div class="truncate"><span class="text-gray-500">Country:</span> <span class="font-semibold">\${country}</span></div>
+                                <div class="truncate"><span class="text-gray-500">ISP:</span> <span class="font-semibold">\${isp}</span></div>
                                 <div><span class="text-gray-500">VPN:</span> <span class="font-semibold">\${details.vpn || '-'}</span></div>
                                 <div><span class="text-gray-500">Tor:</span> <span class="font-semibold">\${details.tor || '-'}</span></div>
                                 <div><span class="text-gray-500">Datacenter:</span> <span class="font-semibold">\${details.datacenter || '-'}</span></div>
@@ -537,9 +530,9 @@ const HTML_PAGE = `
             const scamPanel = document.getElementById('scamalyticsPanel');
             const chPanel = document.getElementById('checkhostPanel');
 
-            const activeClass = 'flex-1 py-2 px-4 rounded-lg font-semibold transition-colors bg-blue-600 text-white';
-            const activeClassPurple = 'flex-1 py-2 px-4 rounded-lg font-semibold transition-colors bg-purple-600 text-white';
-            const inactiveClass = 'flex-1 py-2 px-4 rounded-lg font-semibold transition-colors text-gray-600 hover:bg-gray-100';
+            const activeClass = 'flex-1 py-2 px-2 sm:px-4 text-xs sm:text-sm md:text-base rounded-lg font-semibold transition-colors bg-blue-600 text-white';
+            const activeClassPurple = 'flex-1 py-2 px-2 sm:px-4 text-xs sm:text-sm md:text-base rounded-lg font-semibold transition-colors bg-purple-600 text-white';
+            const inactiveClass = 'flex-1 py-2 px-2 sm:px-4 text-xs sm:text-sm md:text-base rounded-lg font-semibold transition-colors text-gray-600 hover:bg-gray-100';
 
             if (tab === 'scamalytics') {
                 scamPanel.classList.remove('hidden');
@@ -574,9 +567,9 @@ const HTML_PAGE = `
                 console.error('Check-Host node list error:', e);
                 dropdownLabel.textContent = 'Failed to load countries';
                 document.getElementById('chNodesList').innerHTML =
-                    '<p class="text-red-500 text-sm p-3">Failed to load the node list from check-host.net (' +
+                    '<p class="text-red-500 text-xs sm:text-sm p-3">Failed to load the node list from check-host.net (' +
                     (e.message || 'unknown error') +
-                    '). You can still run a check using the "max nodes" fallback above.</p>';
+                    '). You can still run a check using the fallback above.</p>';
             }
         }
 
@@ -597,19 +590,19 @@ const HTML_PAGE = `
             const countryNames = Object.keys(chCountryMap).sort();
 
             if (countryNames.length === 0) {
-                list.innerHTML = '<p class="text-gray-400 text-sm p-3">No countries available.</p>';
+                list.innerHTML = '<p class="text-gray-400 text-xs sm:text-sm p-3">No countries available.</p>';
                 return;
             }
 
             list.innerHTML = countryNames.map(country => {
                 const count = chCountryMap[country].length;
                 return \`
-                    <label class="ch-country-option flex items-center justify-between gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50" data-country-name="\${country.toLowerCase()}">
-                        <span class="flex items-center gap-2">
-                            <input type="checkbox" class="ch-country-checkbox" value="\${country}" onchange="chOnCountryToggle()">
-                            <span>\${country}</span>
+                    <label class="ch-country-option flex items-center justify-between gap-2 px-3 py-2 text-xs sm:text-sm cursor-pointer hover:bg-gray-50 border-b last:border-b-0" data-country-name="\${country.toLowerCase()}">
+                        <span class="flex items-center gap-2 truncate">
+                            <input type="checkbox" class="ch-country-checkbox rounded" value="\${country}" onchange="chOnCountryToggle()">
+                            <span class="truncate">\${country}</span>
                         </span>
-                        <span class="text-gray-400 text-xs">\${count} node\${count > 1 ? 's' : ''}</span>
+                        <span class="text-gray-400 text-xs shrink-0">\${count} node\${count > 1 ? 's' : ''}</span>
                     </label>
                 \`;
             }).join('');
@@ -662,10 +655,10 @@ const HTML_PAGE = `
                 label.className = 'text-gray-500';
             } else if (selected.length <= 2) {
                 label.textContent = selected.join(', ');
-                label.className = 'text-gray-800';
+                label.className = 'text-gray-800 font-medium';
             } else {
                 label.textContent = selected.length + ' countries selected';
-                label.className = 'text-gray-800';
+                label.className = 'text-gray-800 font-medium';
             }
         }
 
@@ -674,7 +667,7 @@ const HTML_PAGE = `
             const selectedCountries = chGetSelectedCountries();
 
             if (selectedCountries.length === 0) {
-                container.innerHTML = '<p class="text-gray-400 text-sm p-3">Select one or more countries above.</p>';
+                container.innerHTML = '<p class="text-gray-400 text-xs sm:text-sm p-3">Select one or more countries above.</p>';
                 return;
             }
 
@@ -685,7 +678,7 @@ const HTML_PAGE = `
                 if (max === 0) return;
 
                 const row = document.createElement('div');
-                row.className = 'flex items-center justify-between px-3 py-2 text-sm';
+                row.className = 'flex items-center justify-between px-3 py-2 text-xs sm:text-sm bg-white';
 
                 let options = '';
                 for (let i = 1; i <= max; i++) {
@@ -693,8 +686,8 @@ const HTML_PAGE = `
                 }
 
                 row.innerHTML = \`
-                    <span>\${country} <span class="text-gray-400 text-xs">(max \${max})</span></span>
-                    <select class="ch-country-count-select border-2 border-gray-200 rounded-lg px-2 py-1 text-sm" data-country="\${country}">
+                    <span class="truncate mr-2">\${country} <span class="text-gray-400 text-xs">(max \${max})</span></span>
+                    <select class="ch-country-count-select border-2 border-gray-200 rounded-lg px-2 py-1 text-xs shrink-0" data-country="\${country}">
                         \${options}
                     </select>
                 \`;
@@ -796,24 +789,32 @@ const HTML_PAGE = `
             document.getElementById('chResults').classList.remove('hidden');
 
             const nodeIds = Object.keys(results);
-            let rows = '';
+            let items = '';
 
             nodeIds.forEach(nodeId => {
                 const info = nodesInfo[nodeId] || {};
                 const location = (info.city || info.country)
                     ? [info.city, info.country].filter(Boolean).join(', ')
                     : (Array.isArray(info) ? [info[2], info[1]].filter(Boolean).join(', ') : '-');
-                rows += \`
-                    <tr class="border-b">
-                        <td class="py-2 px-3 font-medium">\${location || '-'}</td>
-                        <td class="py-2 px-3 text-sm text-gray-500">\${nodeId}</td>
-                        <td class="py-2 px-3">\${chFormatResult(type, results[nodeId])}</td>
-                    </tr>
+                
+                items += \`
+                    <div class="bg-gray-50 border rounded-xl p-3 sm:p-4 transition-all">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-2 mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-base">&#127760;</span>
+                                <span class="font-semibold text-gray-800 text-sm sm:text-base">\${location || '-'}</span>
+                            </div>
+                            <span class="text-xs text-gray-500 font-mono bg-white px-2 py-0.5 rounded border self-start sm:self-auto break-all">\${nodeId}</span>
+                        </div>
+                        <div class="text-xs sm:text-sm font-medium pt-1">
+                            \${chFormatResult(type, results[nodeId])}
+                        </div>
+                    </div>
                 \`;
             });
 
-            document.getElementById('chResultsTable').innerHTML =
-                rows || '<tr><td colspan="3" class="py-4 text-center text-gray-400">No data returned</td></tr>';
+            document.getElementById('chResultsList').innerHTML =
+                items || '<p class="py-4 text-center text-gray-400 text-sm">No data returned</p>';
         }
 
         function chFormatResult(type, nodeResult) {
@@ -824,36 +825,36 @@ const HTML_PAGE = `
                 if (type === 'ping') {
                     const pings = nodeResult[0] || [];
                     const ok = pings.filter(p => p[0] === 'OK').length;
-                    return \`<span class="\${ok > 0 ? 'text-green-600' : 'text-red-600'}">\${ok}/\${pings.length} OK</span>\`;
+                    return \`<span class="\${ok > 0 ? 'text-green-600' : 'text-red-600'} font-bold">\${ok}/\${pings.length} OK</span>\`;
                 }
                 if (type === 'http') {
                     const r = nodeResult[0];
                     if (!r) return '<span class="text-gray-400">No data</span>';
                     const status = r[0], time = r[1], msg = r[2], code = r[3];
                     return status === 1
-                        ? \`<span class="text-green-600">\${code} \${msg} (\${(time * 1000).toFixed(0)}ms)</span>\`
-                        : \`<span class="text-red-600">\${msg || 'Failed'}</span>\`;
+                        ? \`<span class="text-green-600 font-semibold">\${code} \${msg} (\${(time * 1000).toFixed(0)}ms)</span>\`
+                        : \`<span class="text-red-600 font-semibold">\${msg || 'Failed'}</span>\`;
                 }
                 if (type === 'tcp') {
                     const r = nodeResult[0];
                     if (!r) return '<span class="text-gray-400">No data</span>';
                     return r.error
-                        ? \`<span class="text-red-600">\${r.error}</span>\`
-                        : \`<span class="text-green-600">Connected (\${(r.time * 1000).toFixed(0)}ms)</span>\`;
+                        ? \`<span class="text-red-600 font-semibold">\${r.error}</span>\`
+                        : \`<span class="text-green-600 font-semibold">Connected (\${(r.time * 1000).toFixed(0)}ms)</span>\`;
                 }
                 if (type === 'udp') {
                     const r = nodeResult[0];
                     if (!r) return '<span class="text-gray-400">No data</span>';
                     return r.error
-                        ? \`<span class="text-orange-600">\${r.error}</span>\`
-                        : \`<span class="text-green-600">Connected (\${((r.time || 0) * 1000).toFixed(0)}ms)</span>\`;
+                        ? \`<span class="text-orange-600 font-semibold">\${r.error}</span>\`
+                        : \`<span class="text-green-600 font-semibold">Connected (\${((r.time || 0) * 1000).toFixed(0)}ms)</span>\`;
                 }
                 if (type === 'dns') {
                     const r = nodeResult[0];
                     if (!r) return '<span class="text-gray-400">No data</span>';
                     const a = (r.A || []).join(', ') || '-';
                     const aaaa = (r.AAAA || []).join(', ') || '-';
-                    return \`A: \${a}<br><span class="text-gray-400 text-xs">AAAA: \${aaaa}</span>\`;
+                    return \`<div class="space-y-1"><span class="block">A: \${a}</span><span class="block text-gray-400 text-xs">AAAA: \${aaaa}</span></div>\`;
                 }
             } catch (e) {
                 return '<span class="text-gray-400">Parse error</span>';
@@ -918,7 +919,7 @@ async function handleRequest(request) {
     
     return new Response(HTML_PAGE, {
         headers: {
-            'Content-Type': 'text/html;charset=UTF-8',
+            'Content-Type': 'text/html; charset=UTF-8',
             'Cache-Control': 'public, max-age=3600'
         }
     });
@@ -1370,30 +1371,97 @@ function chNormalizeNodesMap(rawMap) {
     return nodes;
 }
 
-async function chFetchJson(url) {
-    const res = await fetch(url, {
-        headers: {
-            'Accept': 'application/json',
-            'User-Agent': getRandomUserAgent()
+async function chFetchJson(targetUrl) {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch(targetUrl, {
+            headers: {
+                'Accept': 'application/json',
+                'User-Agent': getRandomUserAgent()
+            },
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+            const bodyText = await res.text();
+            if (bodyText.trim().startsWith('{') || bodyText.trim().startsWith('[')) {
+                return { status: res.status, ok: true, data: JSON.parse(bodyText) };
+            }
         }
+    } catch (e) {
+    }
+
+    const proxyList = [
+        `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+        `https://jsonp.afeld.me/?url=${encodeURIComponent(targetUrl)}`,
+        `https://thingproxy.freeboard.io/fetch/${targetUrl}`
+    ];
+
+    return await chRaceProxies(proxyList, 6000);
+}
+
+async function chRaceProxies(proxyUrls, timeoutMs) {
+    const promises = proxyUrls.map(url => {
+        return (async () => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const res = await fetch(url, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'User-Agent': getRandomUserAgent()
+                    },
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+
+                const bodyText = await res.text();
+                if (!bodyText || (!bodyText.trim().startsWith('{') && !bodyText.trim().startsWith('['))) {
+                    throw new Error('Non-JSON response');
+                }
+
+                const data = JSON.parse(bodyText);
+                return { status: 200, ok: true, data };
+            } catch (err) {
+                clearTimeout(timeoutId);
+                throw err;
+            }
+        })();
     });
 
-    const contentType = res.headers.get('content-type') || '';
-    const bodyText = await res.text();
+    return new Promise((resolve, reject) => {
+        let errors = [];
+        let resolved = false;
 
-    if (!contentType.toLowerCase().includes('json') && !bodyText.trim().startsWith('{') && !bodyText.trim().startsWith('[')) {
-        const snippet = bodyText.slice(0, 180).replace(/\s+/g, ' ').trim();
-        throw new Error(`check-host.net returned a non-JSON response (HTTP ${res.status}): "${snippet}"`);
-    }
+        promises.forEach(p => {
+            p.then(val => {
+                if (!resolved) {
+                    resolved = true;
+                    resolve(val);
+                }
+            }).catch(err => {
+                errors.push(err.message);
+                if (errors.length === promises.length && !resolved) {
+                    reject(new Error('All proxy attempts failed: ' + errors.join(', ')));
+                }
+            });
+        });
 
-    let data;
-    try {
-        data = JSON.parse(bodyText);
-    } catch (e) {
-        throw new Error(`check-host.net returned invalid JSON (HTTP ${res.status})`);
-    }
-
-    return { status: res.status, ok: res.ok, data };
+        setTimeout(() => {
+            if (!resolved) {
+                resolved = true;
+                reject(new Error('Proxy race timeout'));
+            }
+        }, timeoutMs + 200);
+    });
 }
 
 async function chHandleNodesRequest() {
