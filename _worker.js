@@ -181,13 +181,6 @@ const HTML_PAGE = `
                         placeholder="Host, domain or IP (e.g. example.com)"
                         class="w-full flex-1 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
                     />
-                    <select id="chTypeSelect" class="w-full sm:w-auto px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 bg-white">
-                        <option value="ping">Ping</option>
-                        <option value="http">HTTP</option>
-                        <option value="tcp">TCP</option>
-                        <option value="udp">UDP</option>
-                        <option value="dns">DNS</option>
-                    </select>
                     <button
                         onclick="chRunCheck()"
                         id="chCheckBtn"
@@ -196,25 +189,20 @@ const HTML_PAGE = `
                     </button>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2 sm:gap-4 mb-4 pb-3 border-b">
-                    <label class="text-xs sm:text-sm text-gray-600">Fallback max nodes (if no country selected):</label>
-                    <input type="number" id="chMaxNodes" value="3" min="1" max="10" class="w-16 sm:w-20 px-2 py-1 border-2 border-gray-300 rounded-lg text-xs sm:text-sm">
-                </div>
-
                 <div class="pt-2">
                     <div class="flex justify-between items-center mb-2">
-                        <h3 class="font-semibold text-sm sm:text-base text-gray-700">Filter by Countries</h3>
+                        <h3 class="font-semibold text-sm sm:text-base text-gray-700">Countries</h3>
                         <button onclick="chResetNodeSelection()" class="text-xs px-2.5 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600">Reset</button>
                     </div>
-                    <p class="text-xs text-gray-400 mb-3">Nodes are queried directly from check-host.net.</p>
+                    <p class="text-xs text-gray-400 mb-3">Pick one or more countries â€” each one is checked from every check-host.net node in that country.</p>
 
-                    <div class="relative mb-4">
+                    <div class="relative">
                         <button
                             type="button"
                             id="chCountryDropdownBtn"
                             onclick="chToggleCountryDropdown()"
                             class="w-full flex justify-between items-center px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors bg-white text-left">
-                            <span id="chCountryDropdownLabel" class="text-gray-500 truncate mr-2">Loading countries...</span>
+                            <span id="chCountryDropdownLabel" class="text-gray-500 truncate mr-2">Select countries...</span>
                             <span class="text-gray-400 shrink-0">&#9662;</span>
                         </button>
                         <div id="chCountryDropdownPanel" class="hidden absolute left-0 right-0 mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-xl z-30 max-w-full">
@@ -227,17 +215,12 @@ const HTML_PAGE = `
                             <div id="chCountryOptionsList" class="max-h-48 sm:max-h-56 overflow-y-auto"></div>
                         </div>
                     </div>
-
-                    <h4 class="text-xs sm:text-sm font-semibold text-gray-700 mb-2">Nodes per selected country</h4>
-                    <div id="chNodesList" class="divide-y max-h-48 sm:max-h-56 overflow-y-auto border rounded-lg bg-gray-50/50">
-                        <p class="text-gray-400 text-xs sm:text-sm p-3">Select one or more countries above.</p>
-                    </div>
                 </div>
             </div>
 
             <div id="chLoading" class="hidden text-center py-12">
                 <div class="loading mx-auto mb-4"></div>
-                <p class="text-gray-600 text-sm sm:text-base">Running check across nodes...</p>
+                <p class="text-gray-600 text-sm sm:text-base">Running check...</p>
             </div>
 
             <div id="chError" class="hidden bg-red-50 border-2 border-red-200 rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8 fade-in">
@@ -253,7 +236,7 @@ const HTML_PAGE = `
             <div id="chResults" class="hidden fade-in bg-white rounded-2xl shadow-xl p-4 sm:p-6">
                 <h3 class="font-bold text-base sm:text-lg mb-4 text-gray-800">Results</h3>
                 <div class="w-full overflow-hidden">
-                    <div id="chResultsList" class="space-y-3"></div>
+                    <div id="chResultsList" class="space-y-4"></div>
                 </div>
             </div>
 
@@ -521,8 +504,20 @@ const HTML_PAGE = `
             return domainRegex.test(domain);
         }
 
-        let chNodesCache = null;
-        let chCountryMap = {};
+        const CH_COUNTRIES = [
+            ['us', 'United States'], ['ca', 'Canada'], ['gb', 'United Kingdom'], ['de', 'Germany'],
+            ['fr', 'France'], ['nl', 'Netherlands'], ['ru', 'Russia'], ['ua', 'Ukraine'],
+            ['pl', 'Poland'], ['se', 'Sweden'], ['fi', 'Finland'], ['no', 'Norway'],
+            ['dk', 'Denmark'], ['it', 'Italy'], ['es', 'Spain'], ['ch', 'Switzerland'],
+            ['at', 'Austria'], ['be', 'Belgium'], ['cz', 'Czechia'], ['ro', 'Romania'],
+            ['bg', 'Bulgaria'], ['gr', 'Greece'], ['tr', 'Turkey'], ['il', 'Israel'],
+            ['ae', 'United Arab Emirates'], ['sa', 'Saudi Arabia'], ['ir', 'Iran'], ['in', 'India'],
+            ['cn', 'China'], ['jp', 'Japan'], ['kr', 'South Korea'], ['sg', 'Singapore'],
+            ['hk', 'Hong Kong'], ['tw', 'Taiwan'], ['vn', 'Vietnam'], ['th', 'Thailand'],
+            ['id', 'Indonesia'], ['my', 'Malaysia'], ['ph', 'Philippines'], ['au', 'Australia'],
+            ['br', 'Brazil'], ['mx', 'Mexico'], ['ar', 'Argentina'], ['za', 'South Africa'],
+            ['eg', 'Egypt'], ['kz', 'Kazakhstan']
+        ];
 
         function switchTab(tab) {
             const scamBtn = document.getElementById('tabScamalyticsBtn');
@@ -544,68 +539,20 @@ const HTML_PAGE = `
                 scamPanel.classList.add('hidden');
                 chBtn.className = activeClassPurple;
                 scamBtn.className = inactiveClass;
-                if (!chNodesCache) chLoadNodes();
-            }
-        }
-
-        async function chLoadNodes() {
-            const dropdownLabel = document.getElementById('chCountryDropdownLabel');
-            dropdownLabel.textContent = 'Loading countries...';
-            try {
-                const res = await fetch('/checkhost/nodes');
-                const data = await res.json();
-
-                if (!res.ok || data.ok === false) {
-                    throw new Error(data.message || ('HTTP ' + res.status));
+                if (document.getElementById('chCountryOptionsList').children.length === 0) {
+                    chRenderCountryOptions();
                 }
-
-                chNodesCache = data.nodes || {};
-                chBuildCountryMap();
-                chRenderCountryOptions();
-                chUpdateCountryDropdownLabel();
-            } catch (e) {
-                console.error('Check-Host node list error:', e);
-                dropdownLabel.textContent = 'Failed to load countries';
-                document.getElementById('chNodesList').innerHTML =
-                    '<p class="text-red-500 text-xs sm:text-sm p-3">Failed to load the node list from check-host.net (' +
-                    (e.message || 'unknown error') +
-                    '). You can still run a check using the fallback above.</p>';
             }
-        }
-
-        function chBuildCountryMap() {
-            const countries = {};
-            Object.keys(chNodesCache).forEach(hostId => {
-                const info = chNodesCache[hostId] || {};
-                const countryName = info.country || 'Unknown';
-                if (!countries[countryName]) countries[countryName] = [];
-                countries[countryName].push(hostId);
-            });
-            Object.keys(countries).forEach(c => countries[c].sort());
-            chCountryMap = countries;
         }
 
         function chRenderCountryOptions() {
             const list = document.getElementById('chCountryOptionsList');
-            const countryNames = Object.keys(chCountryMap).sort();
-
-            if (countryNames.length === 0) {
-                list.innerHTML = '<p class="text-gray-400 text-xs sm:text-sm p-3">No countries available.</p>';
-                return;
-            }
-
-            list.innerHTML = countryNames.map(country => {
-                const count = chCountryMap[country].length;
-                return \`
-                    <label class="ch-country-option flex items-center justify-between gap-2 px-3 py-2 text-xs sm:text-sm cursor-pointer hover:bg-gray-50 border-b last:border-b-0" data-country-name="\${country.toLowerCase()}">
-                        <span class="flex items-center gap-2 truncate">
-                            <input type="checkbox" class="ch-country-checkbox rounded" value="\${country}" onchange="chOnCountryToggle()">
-                            <span class="truncate">\${country}</span>
-                        </span>
-                        <span class="text-gray-400 text-xs shrink-0">\${count} node\${count > 1 ? 's' : ''}</span>
-                    </label>
-                \`;
-            }).join('');
+            list.innerHTML = CH_COUNTRIES.map(([code, name]) => \`
+                <label class="ch-country-option flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50" data-country-name="\${name.toLowerCase()}">
+                    <input type="checkbox" class="ch-country-checkbox" value="\${code}" onchange="chOnCountryToggle()">
+                    <span>\${name} <span class="text-gray-400 text-xs">(\${code})</span></span>
+                </label>
+            \`).join('');
         }
 
         function chFilterCountryOptions() {
@@ -644,7 +591,6 @@ const HTML_PAGE = `
 
         function chOnCountryToggle() {
             chUpdateCountryDropdownLabel();
-            chRenderCountryNodeCounts();
         }
 
         function chUpdateCountryDropdownLabel() {
@@ -652,76 +598,31 @@ const HTML_PAGE = `
             const selected = chGetSelectedCountries();
             if (selected.length === 0) {
                 label.textContent = 'Select countries...';
-                label.className = 'text-gray-500';
+                label.className = 'text-gray-500 truncate mr-2';
             } else if (selected.length <= 2) {
-                label.textContent = selected.join(', ');
-                label.className = 'text-gray-800 font-medium';
+                label.textContent = selected.map(c => c.toUpperCase()).join(', ');
+                label.className = 'text-gray-800 truncate mr-2';
             } else {
                 label.textContent = selected.length + ' countries selected';
-                label.className = 'text-gray-800 font-medium';
+                label.className = 'text-gray-800 truncate mr-2';
             }
-        }
-
-        function chRenderCountryNodeCounts() {
-            const container = document.getElementById('chNodesList');
-            const selectedCountries = chGetSelectedCountries();
-
-            if (selectedCountries.length === 0) {
-                container.innerHTML = '<p class="text-gray-400 text-xs sm:text-sm p-3">Select one or more countries above.</p>';
-                return;
-            }
-
-            container.innerHTML = '';
-            selectedCountries.forEach(country => {
-                const ids = chCountryMap[country] || [];
-                const max = ids.length;
-                if (max === 0) return;
-
-                const row = document.createElement('div');
-                row.className = 'flex items-center justify-between px-3 py-2 text-xs sm:text-sm bg-white';
-
-                let options = '';
-                for (let i = 1; i <= max; i++) {
-                    options += \`<option value="\${i}">\${i}</option>\`;
-                }
-
-                row.innerHTML = \`
-                    <span class="truncate mr-2">\${country} <span class="text-gray-400 text-xs">(max \${max})</span></span>
-                    <select class="ch-country-count-select border-2 border-gray-200 rounded-lg px-2 py-1 text-xs shrink-0" data-country="\${country}">
-                        \${options}
-                    </select>
-                \`;
-                container.appendChild(row);
-            });
         }
 
         function chResetNodeSelection() {
             document.querySelectorAll('.ch-country-checkbox').forEach(cb => { cb.checked = false; });
             chUpdateCountryDropdownLabel();
-            chRenderCountryNodeCounts();
-        }
-
-        function chGetSelectedNodes() {
-            const selected = [];
-            document.querySelectorAll('.ch-country-count-select').forEach(sel => {
-                const n = parseInt(sel.value, 10) || 0;
-                if (n > 0) {
-                    const country = sel.getAttribute('data-country');
-                    const ids = (chCountryMap[country] || []).slice(0, n);
-                    selected.push(...ids);
-                }
-            });
-            return selected;
         }
 
         async function chRunCheck() {
             const host = document.getElementById('chHostInput').value.trim();
-            const type = document.getElementById('chTypeSelect').value;
-            const maxNodes = document.getElementById('chMaxNodes').value;
-            const selectedNodes = chGetSelectedNodes();
+            const selectedCountries = chGetSelectedCountries();
 
             if (!host) {
                 chShowError('Please enter a host, domain or IP address');
+                return;
+            }
+            if (selectedCountries.length === 0) {
+                chShowError('Select at least one country');
                 return;
             }
 
@@ -729,40 +630,17 @@ const HTML_PAGE = `
 
             try {
                 const params = new URLSearchParams();
-                params.set('type', type);
                 params.set('host', host);
+                selectedCountries.forEach(c => params.append('country', c));
 
-                if (selectedNodes.length > 0) {
-                    selectedNodes.forEach(n => params.append('node', n));
-                } else if (maxNodes) {
-                    params.set('max_nodes', maxNodes);
+                const res = await fetch('/checkhost/check?' + params.toString());
+                const data = await res.json();
+
+                if (!res.ok || !data.ok) {
+                    throw new Error(data.message || 'Failed to run check');
                 }
 
-                const startRes = await fetch('/checkhost/check?' + params.toString());
-                const startData = await startRes.json();
-
-                if (!startRes.ok || !startData.ok) {
-                    throw new Error(startData.message || 'Failed to start check');
-                }
-
-                const requestId = startData.request_id;
-                const nodesInfo = startData.nodes || {};
-
-                let attempts = 0;
-                let resultData = { results: {} };
-
-                while (attempts < 20) {
-                    await new Promise(r => setTimeout(r, 1500));
-                    const resultRes = await fetch('/checkhost/result/' + requestId);
-                    resultData = await resultRes.json();
-
-                    const values = Object.values(resultData.results || {});
-                    const stillPending = values.length === 0 || values.some(v => v === null);
-                    if (!stillPending) break;
-                    attempts++;
-                }
-
-                chDisplayResults(type, nodesInfo, resultData.results || {});
+                chDisplayResults(data.host, data.results);
 
             } catch (error) {
                 console.error('Check-Host error:', error);
@@ -783,83 +661,66 @@ const HTML_PAGE = `
             document.getElementById('chErrorMessage').textContent = message;
         }
 
-        function chDisplayResults(type, nodesInfo, results) {
+        function chDisplayResults(host, results) {
             document.getElementById('chLoading').classList.add('hidden');
             document.getElementById('chError').classList.add('hidden');
             document.getElementById('chResults').classList.remove('hidden');
 
-            const nodeIds = Object.keys(results);
-            let items = '';
+            const listDiv = document.getElementById('chResultsList');
+            listDiv.innerHTML = '';
 
-            nodeIds.forEach(nodeId => {
-                const info = nodesInfo[nodeId] || {};
-                const location = (info.city || info.country)
-                    ? [info.city, info.country].filter(Boolean).join(', ')
-                    : (Array.isArray(info) ? [info[2], info[1]].filter(Boolean).join(', ') : '-');
-                
-                items += \`
-                    <div class="bg-gray-50 border rounded-xl p-3 sm:p-4 transition-all">
-                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-2 mb-2">
-                            <div class="flex items-center gap-2">
-                                <span class="text-base">&#127760;</span>
-                                <span class="font-semibold text-gray-800 text-sm sm:text-base">\${location || '-'}</span>
-                            </div>
-                            <span class="text-xs text-gray-500 font-mono bg-white px-2 py-0.5 rounded border self-start sm:self-auto break-all">\${nodeId}</span>
+            results.forEach(entry => {
+                if (!entry.ok) {
+                    listDiv.innerHTML += \`
+                        <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+                            <p class="font-semibold text-red-700">\${entry.country.toUpperCase()}</p>
+                            <p class="text-sm text-red-500">\${entry.message || 'Request failed'}</p>
                         </div>
-                        <div class="text-xs sm:text-sm font-medium pt-1">
-                            \${chFormatResult(type, results[nodeId])}
+                    \`;
+                    return;
+                }
+
+                const d = entry.data;
+                const accessible = !!d.is_accessible;
+                const badgeClass = accessible ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
+                const badgeText = accessible ? 'Accessible' : 'Not accessible';
+
+                let nodeRows = '';
+                Object.keys(d.details || {}).forEach(nodeId => {
+                    const n = d.details[nodeId] || {};
+                    const nodeOk = n.status === 'OK';
+                    nodeRows += \`
+                        <tr class="border-b last:border-b-0">
+                            <td class="py-1.5 px-2 text-xs sm:text-sm text-gray-600">\${nodeId}</td>
+                            <td class="py-1.5 px-2 text-xs sm:text-sm font-semibold \${nodeOk ? 'text-green-600' : 'text-red-600'}">\${n.status || '-'}</td>
+                            <td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700">\${n.ping_ms != null ? n.ping_ms + ' ms' : '-'}</td>
+                        </tr>
+                    \`;
+                });
+
+                listDiv.innerHTML += \`
+                    <div class="border-2 border-gray-100 rounded-xl p-4">
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="font-bold text-gray-800">\${(d.country || entry.country).toUpperCase()}</h4>
+                            <span class="px-3 py-1 rounded-full text-xs font-semibold \${badgeClass}">\${badgeText}</span>
                         </div>
+                        <p class="text-xs sm:text-sm text-gray-500 mb-3">\${d.nodes_checked || 0} node(s) checked for \${d.host || host}</p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead>
+                                    <tr class="border-b text-gray-500 text-xs">
+                                        <td class="py-1 px-2">Node</td>
+                                        <td class="py-1 px-2">Status</td>
+                                        <td class="py-1 px-2">Ping</td>
+                                    </tr>
+                                </thead>
+                                <tbody>\${nodeRows}</tbody>
+                            </table>
+                        </div>
+                        \${d.report_url ? \`<a href="\${d.report_url}" target="_blank" rel="noopener noreferrer" class="inline-block mt-3 text-xs sm:text-sm text-purple-600 hover:underline">View full report on check-host.net &rarr;</a>\` : ''}
                     </div>
                 \`;
             });
-
-            document.getElementById('chResultsList').innerHTML =
-                items || '<p class="py-4 text-center text-gray-400 text-sm">No data returned</p>';
-        }
-
-        function chFormatResult(type, nodeResult) {
-            if (nodeResult === null || nodeResult === undefined) {
-                return '<span class="text-orange-500">Pending / no response</span>';
-            }
-            try {
-                if (type === 'ping') {
-                    const pings = nodeResult[0] || [];
-                    const ok = pings.filter(p => p[0] === 'OK').length;
-                    return \`<span class="\${ok > 0 ? 'text-green-600' : 'text-red-600'} font-bold">\${ok}/\${pings.length} OK</span>\`;
-                }
-                if (type === 'http') {
-                    const r = nodeResult[0];
-                    if (!r) return '<span class="text-gray-400">No data</span>';
-                    const status = r[0], time = r[1], msg = r[2], code = r[3];
-                    return status === 1
-                        ? \`<span class="text-green-600 font-semibold">\${code} \${msg} (\${(time * 1000).toFixed(0)}ms)</span>\`
-                        : \`<span class="text-red-600 font-semibold">\${msg || 'Failed'}</span>\`;
-                }
-                if (type === 'tcp') {
-                    const r = nodeResult[0];
-                    if (!r) return '<span class="text-gray-400">No data</span>';
-                    return r.error
-                        ? \`<span class="text-red-600 font-semibold">\${r.error}</span>\`
-                        : \`<span class="text-green-600 font-semibold">Connected (\${(r.time * 1000).toFixed(0)}ms)</span>\`;
-                }
-                if (type === 'udp') {
-                    const r = nodeResult[0];
-                    if (!r) return '<span class="text-gray-400">No data</span>';
-                    return r.error
-                        ? \`<span class="text-orange-600 font-semibold">\${r.error}</span>\`
-                        : \`<span class="text-green-600 font-semibold">Connected (\${((r.time || 0) * 1000).toFixed(0)}ms)</span>\`;
-                }
-                if (type === 'dns') {
-                    const r = nodeResult[0];
-                    if (!r) return '<span class="text-gray-400">No data</span>';
-                    const a = (r.A || []).join(', ') || '-';
-                    const aaaa = (r.AAAA || []).join(', ') || '-';
-                    return \`<div class="space-y-1"><span class="block">A: \${a}</span><span class="block text-gray-400 text-xs">AAAA: \${aaaa}</span></div>\`;
-                }
-            } catch (e) {
-                return '<span class="text-gray-400">Parse error</span>';
-            }
-            return JSON.stringify(nodeResult);
         }
     </script>
 </body>
@@ -1318,255 +1179,81 @@ function jsonResponse(data, status = 200) {
     });
 }
 
-const CH_ALLOWED_TYPES = ['ping', 'http', 'tcp', 'udp', 'dns'];
-const CH_API_BASE = 'https://check-host.net';
+const CH_RENDER_API_BASE = 'https://check-host.onrender.com';
 
 async function chHandleRequest(request, chSubPath) {
-    if (chSubPath === '' || chSubPath === 'nodes') {
-        return chHandleNodesRequest();
-    }
     if (chSubPath === 'check') {
         return chHandleCheckRequest(request);
-    }
-    if (chSubPath.startsWith('result/')) {
-        const requestId = chSubPath.substring('result/'.length);
-        return chHandleResultRequest(requestId, request);
     }
     return chJsonResponse({ ok: false, message: 'Unknown Check-Host endpoint' }, 404);
 }
 
-function chNormalizeNodesMap(rawMap) {
-    const nodes = {};
-    if (!rawMap || typeof rawMap !== 'object') return nodes;
+async function chHandleCheckRequest(request) {
+    const url = new URL(request.url);
+    const host = url.searchParams.get('host');
+    const countries = url.searchParams.getAll('country');
 
-    Object.keys(rawMap).forEach(hostId => {
-        const entry = rawMap[hostId];
-        if (entry && Array.isArray(entry.location)) {
-            nodes[hostId] = {
-                country_code: entry.location[0] || null,
-                country: entry.location[1] || null,
-                city: entry.location[2] || null,
-                ip: entry.ip || null,
-                asn: entry.asn ? String(entry.asn).trim() : null
-            };
-        } else if (Array.isArray(entry)) {
-            nodes[hostId] = {
-                country_code: entry[0] || null,
-                country: entry[1] || null,
-                city: entry[2] || null,
-                ip: entry[3] || null,
-                asn: entry[4] ? String(entry[4]).trim() : null
-            };
-        } else if (entry && typeof entry === 'object') {
-            nodes[hostId] = {
-                country_code: entry.country_code || entry.country || null,
-                country: entry.country || entry.country_name || null,
-                city: entry.city || null,
-                ip: entry.ip || null,
-                asn: entry.asn ? String(entry.asn).trim() : null
-            };
-        }
-    });
-
-    return nodes;
-}
-
-async function chFetchJson(targetUrl) {
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
-        const res = await fetch(targetUrl, {
-            headers: {
-                'Accept': 'application/json',
-                'User-Agent': getRandomUserAgent()
-            },
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-            const bodyText = await res.text();
-            if (bodyText.trim().startsWith('{') || bodyText.trim().startsWith('[')) {
-                return { status: res.status, ok: true, data: JSON.parse(bodyText) };
-            }
-        }
-    } catch (e) {
+    if (!host) {
+        return chJsonResponse({ ok: false, message: 'Missing "host" parameter' }, 400);
+    }
+    if (countries.length === 0) {
+        return chJsonResponse({ ok: false, message: 'Select at least one country' }, 400);
     }
 
-    const proxyList = [
-        `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`,
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-        `https://jsonp.afeld.me/?url=${encodeURIComponent(targetUrl)}`,
-        `https://thingproxy.freeboard.io/fetch/${targetUrl}`
-    ];
+    const limitedCountries = countries.slice(0, 10);
 
-    return await chRaceProxies(proxyList, 6000);
+    const results = await Promise.all(limitedCountries.map(country => chCheckSingleCountry(host, country)));
+
+    return chJsonResponse({ ok: true, host, results });
 }
 
-async function chRaceProxies(proxyUrls, timeoutMs) {
-    const promises = proxyUrls.map(url => {
-        return (async () => {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-            try {
-                const res = await fetch(url, {
-                    headers: {
-                        'Accept': 'application/json',
-                        'User-Agent': getRandomUserAgent()
-                    },
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-
-                if (!res.ok) {
-                    throw new Error(`HTTP ${res.status}`);
-                }
-
-                const bodyText = await res.text();
-                if (!bodyText || (!bodyText.trim().startsWith('{') && !bodyText.trim().startsWith('['))) {
-                    throw new Error('Non-JSON response');
-                }
-
-                const data = JSON.parse(bodyText);
-                return { status: 200, ok: true, data };
-            } catch (err) {
-                clearTimeout(timeoutId);
-                throw err;
-            }
-        })();
-    });
-
-    return new Promise((resolve, reject) => {
-        let errors = [];
-        let resolved = false;
-
-        promises.forEach(p => {
-            p.then(val => {
-                if (!resolved) {
-                    resolved = true;
-                    resolve(val);
-                }
-            }).catch(err => {
-                errors.push(err.message);
-                if (errors.length === promises.length && !resolved) {
-                    reject(new Error('All proxy attempts failed: ' + errors.join(', ')));
-                }
-            });
-        });
-
-        setTimeout(() => {
-            if (!resolved) {
-                resolved = true;
-                reject(new Error('Proxy race timeout'));
-            }
-        }, timeoutMs + 200);
-    });
-}
-
-async function chHandleNodesRequest() {
-    const cacheKey = new Request('https://cache.internal/checkhost-nodes-v2', { method: 'GET' });
+async function chCheckSingleCountry(host, country) {
+    const cacheUrl = new URL('https://cache.internal/checkhost-render');
+    cacheUrl.searchParams.set('country', country);
+    cacheUrl.searchParams.set('host', host);
+    const cacheKey = new Request(cacheUrl.toString(), { method: 'GET' });
     const cache = caches.default;
 
     const cached = await cache.match(cacheKey);
     if (cached) {
-        const headers = new Headers(cached.headers);
-        headers.set('X-Cache', 'HIT');
-        return new Response(cached.body, { status: cached.status, headers });
+        const data = await cached.json();
+        return { country, ok: true, data };
     }
+
+    const target = `${CH_RENDER_API_BASE}/${encodeURIComponent(country)}/${encodeURIComponent(host)}`;
 
     try {
-        const { ok, status, data: raw } = await chFetchJson(`${CH_API_BASE}/nodes/hosts`);
-
-        if (!ok) {
-            throw new Error(`Upstream returned HTTP ${status}`);
-        }
-
-        const rawMap = (raw && typeof raw === 'object' && raw.nodes) ? raw.nodes : raw;
-
-        if (!rawMap || typeof rawMap !== 'object' || Array.isArray(rawMap)) {
-            throw new Error('Unexpected response shape from check-host.net');
-        }
-
-        const nodes = chNormalizeNodesMap(rawMap);
-
-        if (Object.keys(nodes).length === 0) {
-            throw new Error('Node list from check-host.net was empty after parsing');
-        }
-
-        const response = chJsonResponse({ ok: true, nodes });
-        response.headers.set('X-Cache', 'MISS');
-        response.headers.set('Cache-Control', 'public, max-age=3600');
-
-        await cache.put(cacheKey, response.clone());
-        return response;
-    } catch (e) {
-        return chJsonResponse({
-            ok: false,
-            message: 'Failed to fetch Check-Host node list: ' + (e.message || 'unknown error')
-        }, 502);
-    }
-}
-
-async function chHandleCheckRequest(request) {
-    const url = new URL(request.url);
-    const type = url.searchParams.get('type');
-    const host = url.searchParams.get('host');
-    const maxNodes = url.searchParams.get('max_nodes');
-    const nodes = url.searchParams.getAll('node');
-
-    if (!type || !CH_ALLOWED_TYPES.includes(type)) {
-        return chJsonResponse({ ok: false, message: 'Invalid or missing "type" parameter. Allowed: ' + CH_ALLOWED_TYPES.join(', ') }, 400);
-    }
-    if (!host) {
-        return chJsonResponse({ ok: false, message: 'Missing "host" parameter' }, 400);
-    }
-
-    const queryParts = [`host=${encodeURIComponent(host)}`];
-
-    if (nodes.length > 0) {
-        nodes.forEach(n => queryParts.push(`node=${encodeURIComponent(n)}`));
-    } else if (maxNodes) {
-        const safeMaxNodes = Math.min(Math.max(parseInt(maxNodes, 10) || 3, 1), 10);
-        queryParts.push(`max_nodes=${safeMaxNodes}`);
-    }
-
-    const upstreamUrl = `${CH_API_BASE}/check-${type}?${queryParts.join('&')}`;
-
-    try {
-        const { ok, status, data } = await chFetchJson(upstreamUrl);
-
-        if (!ok || !data || data.error) {
-            const message = data && data.error ? (Array.isArray(data.error) ? data.error.join(', ') : data.error) : `Upstream returned HTTP ${status}`;
-            return chJsonResponse({ ok: false, message }, ok ? 400 : 502);
-        }
-
-        return chJsonResponse({
-            ok: true,
-            request_id: data.request_id || null,
-            permanent_link: data.permanent_link || null,
-            nodes: chNormalizeNodesMap(data.nodes || {})
+        const res = await fetch(target, {
+            headers: { 'Accept': 'application/json' }
         });
-    } catch (e) {
-        return chJsonResponse({ ok: false, message: 'Failed to start Check-Host check: ' + (e.message || 'unknown error') }, 502);
-    }
-}
 
-async function chHandleResultRequest(requestId, request) {
-    if (!requestId || !/^[a-zA-Z0-9_-]+$/.test(requestId)) {
-        return chJsonResponse({ ok: false, message: 'Invalid request id' }, 400);
-    }
+        const contentType = res.headers.get('content-type') || '';
+        const bodyText = await res.text();
 
-    try {
-        const { ok, status, data: raw } = await chFetchJson(`${CH_API_BASE}/check-result/${requestId}`);
-
-        if (!ok) {
-            throw new Error(`Upstream returned HTTP ${status}`);
+        if (!contentType.toLowerCase().includes('json')) {
+            const snippet = bodyText.slice(0, 150).replace(/\s+/g, ' ').trim();
+            throw new Error(`Non-JSON response (HTTP ${res.status}): "${snippet}"`);
         }
 
-        return chJsonResponse({ ok: true, results: raw || {} });
+        let data;
+        try {
+            data = JSON.parse(bodyText);
+        } catch (e) {
+            throw new Error(`Invalid JSON response (HTTP ${res.status})`);
+        }
+
+        if (!res.ok) {
+            throw new Error((data && data.message) || `HTTP ${res.status}`);
+        }
+
+        const cacheResponse = new Response(JSON.stringify(data), {
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' }
+        });
+        await cache.put(cacheKey, cacheResponse);
+
+        return { country, ok: true, data };
     } catch (e) {
-        return chJsonResponse({ ok: false, message: 'Failed to fetch Check-Host result: ' + (e.message || 'unknown error') }, 502);
+        return { country, ok: false, message: e.message || 'Request failed' };
     }
 }
 
@@ -1580,4 +1267,4 @@ function chJsonResponse(data, status = 200) {
             'Access-Control-Allow-Headers': 'Content-Type',
         }
     });
-}
+            }
