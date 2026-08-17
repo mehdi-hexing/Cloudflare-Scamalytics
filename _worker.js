@@ -55,13 +55,11 @@ const HTML_PAGE = `
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <!-- Header -->
         <div class="text-center mb-8">
             <h1 class="text-4xl font-bold text-gray-800 mb-2">Scamalytics IP Checker</h1>
             <p class="text-gray-600">Check IP Fraud Risk & Score Analysis</p>
         </div>
 
-        <!-- Tab Switcher -->
         <div class="mb-6">
             <div class="flex gap-2 bg-white rounded-xl shadow-lg p-2">
                 <button id="tabScamalyticsBtn" onclick="switchTab('scamalytics')" class="flex-1 py-2 px-4 rounded-lg font-semibold transition-colors bg-blue-600 text-white">
@@ -73,10 +71,8 @@ const HTML_PAGE = `
             </div>
         </div>
 
-        <!-- ===================== Scamalytics Panel ===================== -->
         <div id="scamalyticsPanel">
 
-        <!-- Input Section -->
         <div class="bg-white rounded-2xl shadow-xl p-6 mb-8">
             <div class="flex flex-col sm:flex-row gap-4">
                 <input 
@@ -93,19 +89,17 @@ const HTML_PAGE = `
                 </button>
             </div>
             <p class="text-sm text-gray-500 mt-3">You can also use URL parameter: ?ip=8.8.8.8</p>
-            <p class="text-sm text-blue-600 mt-2">API Endpoints: <code class="bg-gray-100 px-2 py-1 rounded">/8.8.8.8</code>, <code class="bg-gray-100 px-2 py-1 rounded">/api/example.com</code> (IPv4, IPv6 and domains are all supported — a domain is resolved and every IP behind it is checked)</p>
+            <p class="text-sm text-blue-600 mt-2">API Endpoints: <code class="bg-gray-100 px-2 py-1 rounded">/8.8.8.8</code>, <code class="bg-gray-100 px-2 py-1 rounded">/api/example.com</code> (IPv4, IPv6 and domains are all supported â€” a domain is resolved and every IP behind it is checked)</p>
         </div>
 
-        <!-- Loading -->
         <div id="loading" class="hidden text-center py-12">
             <div class="loading mx-auto mb-4"></div>
             <p class="text-gray-600">Fetching data...</p>
         </div>
 
-        <!-- Error -->
         <div id="error" class="hidden bg-red-50 border-2 border-red-200 rounded-2xl p-6 mb-8 fade-in">
             <div class="flex items-center gap-3">
-                <span class="text-3xl">⚠️</span>
+                <span class="text-3xl">âš ï¸</span>
                 <div>
                     <h3 class="font-bold text-red-800">Error Fetching Data</h3>
                     <p id="errorMessage" class="text-red-600"></p>
@@ -113,9 +107,7 @@ const HTML_PAGE = `
             </div>
         </div>
 
-        <!-- Results -->
         <div id="results" class="hidden fade-in">
-            <!-- Score Card -->
             <div id="scoreCard" class="rounded-2xl shadow-xl p-8 mb-6 text-white">
                 <div class="text-center">
                     <h2 class="text-xl font-semibold mb-2">Fraud Score</h2>
@@ -124,12 +116,10 @@ const HTML_PAGE = `
                 </div>
             </div>
 
-            <!-- Details Grid -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <!-- IP Info -->
                 <div class="bg-white rounded-xl shadow-lg p-6">
                     <h3 class="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2">
-                        <span>🌐</span> IP Information
+                        <span>ðŸŒ</span> IP Information
                     </h3>
                     <div class="space-y-3">
                         <div class="flex justify-between border-b pb-2">
@@ -151,29 +141,24 @@ const HTML_PAGE = `
                     </div>
                 </div>
 
-                <!-- Risk Factors -->
                 <div class="bg-white rounded-xl shadow-lg p-6">
                     <h3 class="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2">
-                        <span>⚡</span> Risk Factors
+                        <span>âš¡</span> Risk Factors
                     </h3>
                     <div class="space-y-3" id="riskFactors">
-                        <!-- Will be populated dynamically -->
                     </div>
                 </div>
             </div>
 
-            <!-- Additional Info -->
             <div class="bg-white rounded-xl shadow-lg p-6">
                 <h3 class="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2">
-                    <span>📊</span> Additional Information
+                    <span>ðŸ“Š</span> Additional Information
                 </h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4" id="additionalInfo">
-                    <!-- Will be populated dynamically -->
                 </div>
             </div>
         </div>
 
-        <!-- Domain Results (a domain can resolve to several IPs; each is checked separately) -->
         <div id="domainResults" class="hidden fade-in">
             <div class="bg-white rounded-2xl shadow-xl p-6 mb-4">
                 <h2 class="text-xl font-bold text-gray-800 mb-1">Domain: <span id="domainName" class="text-blue-600"></span></h2>
@@ -183,12 +168,9 @@ const HTML_PAGE = `
         </div>
 
         </div>
-        <!-- ===================== End Scamalytics Panel ===================== -->
 
-        <!-- ===================== Check-Host Panel (fully isolated, own state & endpoints) ===================== -->
         <div id="checkhostPanel" class="hidden">
 
-            <!-- Input Section -->
             <div class="bg-white rounded-2xl shadow-xl p-6 mb-8">
                 <div class="flex flex-col sm:flex-row gap-4 mb-4">
                     <input
@@ -222,7 +204,7 @@ const HTML_PAGE = `
                         <h3 class="font-semibold text-gray-700">Countries</h3>
                         <button onclick="chResetNodeSelection()" class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg">Reset</button>
                     </div>
-                    <p class="text-xs text-gray-400 mb-2">The country list, and how many nodes exist in each one, come directly from check-host.net's own node list — the worker just relays it.</p>
+                    <p class="text-xs text-gray-400 mb-2">The country list, and how many nodes exist in each one, come directly from check-host.net's own node list â€” the worker just relays it.</p>
 
                     <div class="relative mb-3">
                         <button
@@ -251,17 +233,14 @@ const HTML_PAGE = `
                 </div>
             </div>
 
-            <!-- Loading -->
             <div id="chLoading" class="hidden text-center py-12">
                 <div class="loading mx-auto mb-4"></div>
                 <p class="text-gray-600">Running check across nodes...</p>
             </div>
 
-
-            <!-- Error -->
             <div id="chError" class="hidden bg-red-50 border-2 border-red-200 rounded-2xl p-6 mb-8 fade-in">
                 <div class="flex items-center gap-3">
-                    <span class="text-3xl">⚠️</span>
+                    <span class="text-3xl">âš ï¸</span>
                     <div>
                         <h3 class="font-bold text-red-800">Error Running Check</h3>
                         <p id="chErrorMessage" class="text-red-600"></p>
@@ -269,7 +248,6 @@ const HTML_PAGE = `
                 </div>
             </div>
 
-            <!-- Results -->
             <div id="chResults" class="hidden fade-in bg-white rounded-2xl shadow-xl p-6">
                 <h3 class="font-bold text-lg mb-4 text-gray-800">Results</h3>
                 <div class="overflow-x-auto">
@@ -287,7 +265,6 @@ const HTML_PAGE = `
             </div>
 
         </div>
-        <!-- ===================== End Check-Host Panel ===================== -->
 
     </div>
 
@@ -339,7 +316,6 @@ const HTML_PAGE = `
                 }
 
                 if (Array.isArray(data.results)) {
-                    // Domain resolved to one or more IPs — each is a separate Scamalytics lookup.
                     displayDomainResults(data.info.domain, data.results);
                 } else {
                     displayResults({
@@ -416,12 +392,12 @@ const HTML_PAGE = `
             riskFactorsDiv.innerHTML = '';
             
             const factorsToShow = [
-                { key: 'Anonymizing VPN', icon: '🔒' },
-                { key: 'Tor Exit Node', icon: '🧅' },
-                { key: 'Server', icon: '🖥️' },
-                { key: 'Public Proxy', icon: '🌐' },
-                { key: 'Web Proxy', icon: '🔄' },
-                { key: 'Datacenter', icon: '🏢' }
+                { key: 'Anonymizing VPN', icon: 'ðŸ”’' },
+                { key: 'Tor Exit Node', icon: 'ðŸ§…' },
+                { key: 'Server', icon: 'ðŸ–¥ï¸' },
+                { key: 'Public Proxy', icon: 'ðŸŒ' },
+                { key: 'Web Proxy', icon: 'ðŸ”„' },
+                { key: 'Datacenter', icon: 'ðŸ¢' }
             ];
 
             factorsToShow.forEach(factor => {
@@ -462,8 +438,6 @@ const HTML_PAGE = `
             });
         }
 
-        // Renders one compact card per IP behind a domain. Reuses the same risk-color
-        // classes (risk-low/medium/high/very-high) as the single-IP score card above.
         function displayDomainResults(domain, results) {
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('error').classList.add('hidden');
@@ -543,7 +517,6 @@ const HTML_PAGE = `
             return ip.split('.').every(part => parseInt(part, 10) >= 0 && parseInt(part, 10) <= 255);
         }
 
-        // Supports full-form, zero-compressed ("::") and IPv4-mapped IPv6 addresses.
         function isValidIPv6(ip) {
             const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))$/;
             return ipv6Regex.test(ip);
@@ -555,14 +528,7 @@ const HTML_PAGE = `
             return domainRegex.test(domain);
         }
 
-        // ===================== Check-Host Section (frontend) =====================
-        // Fully isolated from the Scamalytics logic above: separate state (chNodesCache),
-        // separate DOM ids (ch* prefix), separate endpoints (/checkhost/*), separate functions.
-
         let chNodesCache = null;
-        // Maps country name -> array of node host-ids in that country.
-        // Built once from /checkhost/nodes; purely a client-side grouping of
-        // check-host.net's own data, nothing computed or guessed by the worker.
         let chCountryMap = {};
 
         function switchTab(tab) {
@@ -614,9 +580,6 @@ const HTML_PAGE = `
             }
         }
 
-        // Groups nodes by country exactly as check-host.net reports them.
-        // Nothing here is invented — country names and per-country counts are
-        // whatever /checkhost/nodes (a thin relay of check-host.net) returned.
         function chBuildCountryMap() {
             const countries = {};
             Object.keys(chNodesCache).forEach(hostId => {
@@ -629,9 +592,6 @@ const HTML_PAGE = `
             chCountryMap = countries;
         }
 
-        // Renders the checkbox list inside the dropdown panel, one row per
-        // country with its live node count. Works like the "type" select
-        // visually, but opens a panel so several countries can be checked at once.
         function chRenderCountryOptions() {
             const list = document.getElementById('chCountryOptionsList');
             const countryNames = Object.keys(chCountryMap).sort();
@@ -709,9 +669,6 @@ const HTML_PAGE = `
             }
         }
 
-        // For every currently checked country, show a row with a count select
-        // going from 1 up to that country's own node total (the only number
-        // that ever differs between countries, read straight from check-host.net's data).
         function chRenderCountryNodeCounts() {
             const container = document.getElementById('chNodesList');
             const selectedCountries = chGetSelectedCountries();
@@ -751,9 +708,6 @@ const HTML_PAGE = `
             chRenderCountryNodeCounts();
         }
 
-        // Turns the selected countries + their chosen counts into an explicit
-        // list of node host-ids, taking the first N nodes check-host.net
-        // reported for each selected country.
         function chGetSelectedNodes() {
             const selected = [];
             document.querySelectorAll('.ch-country-count-select').forEach(sel => {
@@ -928,8 +882,6 @@ async function handleRequest(request) {
     
     const cleanPath = path.replace(/^\/+|\/+$/g, '');
 
-    // Check-Host section: routed off first, on its own path prefix, so it can never
-    // collide with the Scamalytics IP-based routes below.
     if (cleanPath === 'checkhost' || cleanPath.startsWith('checkhost/')) {
         const chSubPath = cleanPath === 'checkhost' ? '' : cleanPath.substring('checkhost/'.length);
         return chHandleRequest(request, chSubPath);
@@ -1024,8 +976,6 @@ async function handleAPIRequest(ip, request) {
     }
 }
 
-// Shared by both the single-IP path (handleAPIRequest) and the multi-IP domain
-// path (handleDomainRequest) so both return details in the exact same shape.
 function buildIpDetails(data) {
     const countryCode = data.details['Country Code'] || null;
     const flagEmoji = getFlagEmoji(countryCode);
@@ -1050,10 +1000,6 @@ function buildIpDetails(data) {
     };
 }
 
-// A domain can sit behind several IPs (load balancers, CDNs, round-robin DNS, ...).
-// This resolves the domain via DNS-over-HTTPS (both A and AAAA records) and runs
-// the exact same Scamalytics lookup used for a single IP against every address found,
-// in parallel. Nothing about the Scamalytics scraping/parsing logic itself changes.
 async function handleDomainRequest(domain, request) {
     const cacheUrl = new URL(request.url);
     cacheUrl.pathname = `/domain-cache/${domain}`;
@@ -1082,7 +1028,6 @@ async function handleDomainRequest(domain, request) {
             }, 404);
         }
 
-        // Cap the number of IPs checked per domain to keep a single request bounded.
         const limitedIps = ips.slice(0, 10);
 
         const results = await Promise.all(limitedIps.map(async (ip) => {
@@ -1129,8 +1074,6 @@ async function handleDomainRequest(domain, request) {
     }
 }
 
-// Resolves a domain to its IPv4 (A) and IPv6 (AAAA) addresses using Cloudflare's
-// own DNS-over-HTTPS resolver — no extra dependency, no extra third-party service.
 async function resolveDomain(domain) {
     const doh = (type) => fetch(
         `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=${type}`,
@@ -1328,16 +1271,11 @@ function isValidIPv4(ip) {
     return ip.split('.').every(part => parseInt(part, 10) >= 0 && parseInt(part, 10) <= 255);
 }
 
-// Handles full-form, zero-compressed ("::") and IPv4-mapped IPv6 addresses —
-// the earlier regex only matched the full 8-group form and rejected almost
-// every real-world IPv6 address (e.g. 2001:4860:4860::8888).
 function isValidIPv6(ip) {
     const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))$/;
     return ipv6Regex.test(ip);
 }
 
-// Basic hostname validation: labels of 1-63 chars (letters/digits/hyphens,
-// no leading/trailing hyphen), at least one dot, TLD of 2+ letters.
 function isValidDomain(domain) {
     if (!domain || domain.length > 253) return false;
     const domainRegex = /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,}$/;
@@ -1379,16 +1317,6 @@ function jsonResponse(data, status = 200) {
     });
 }
 
-// =====================================================================================
-// Check-Host Section (backend) — fully isolated from Scamalytics section above.
-// - Own route prefix: /checkhost/*
-// - Own cache key namespace: "checkhost-nodes" (distinct from the Scamalytics "/api-cache/*" keys)
-// - Own response helper: chJsonResponse (kept separate from jsonResponse on purpose,
-//   even though currently identical, so future changes to one never leak into the other)
-// - Talks only to check-host.net's official public JSON API — no HTML scraping,
-//   no third-party CORS proxies, no shared state with the Scamalytics fetch logic.
-// =====================================================================================
-
 const CH_ALLOWED_TYPES = ['ping', 'http', 'tcp', 'udp', 'dns'];
 const CH_API_BASE = 'https://check-host.net';
 
@@ -1406,9 +1334,6 @@ async function chHandleRequest(request, chSubPath) {
     return chJsonResponse({ ok: false, message: 'Unknown Check-Host endpoint' }, 404);
 }
 
-// check-host.net reports nodes as a flat map of hostId -> [countryCode, countryName, city, ip, asn].
-// This turns that into a stable object shape, used by every endpoint that returns node info
-// (nodes list, check-start response) so the frontend only ever deals with one shape.
 function chNormalizeNodesMap(rawMap) {
     const nodes = {};
     if (!rawMap || typeof rawMap !== 'object') return nodes;
@@ -1437,7 +1362,35 @@ function chNormalizeNodesMap(rawMap) {
     return nodes;
 }
 
-// GET /checkhost/nodes -> normalized + cached list of available check-host.net nodes.
+async function chFetchJson(url) {
+    const res = await fetch(url, {
+        headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'User-Agent': getRandomUserAgent(),
+            'Referer': 'https://check-host.net/',
+            'Origin': 'https://check-host.net'
+        }
+    });
+
+    const contentType = res.headers.get('content-type') || '';
+    const bodyText = await res.text();
+
+    if (!contentType.toLowerCase().includes('json')) {
+        const snippet = bodyText.slice(0, 180).replace(/\s+/g, ' ').trim();
+        throw new Error(`check-host.net returned a non-JSON response (HTTP ${res.status}): "${snippet}"`);
+    }
+
+    let data;
+    try {
+        data = JSON.parse(bodyText);
+    } catch (e) {
+        throw new Error(`check-host.net returned invalid JSON (HTTP ${res.status})`);
+    }
+
+    return { status: res.status, ok: res.ok, data };
+}
+
 async function chHandleNodesRequest() {
     const cacheKey = new Request('https://cache.internal/checkhost-nodes-v2', { method: 'GET' });
     const cache = caches.default;
@@ -1450,18 +1403,12 @@ async function chHandleNodesRequest() {
     }
 
     try {
-        const res = await fetch(`${CH_API_BASE}/nodes/hosts`, {
-            headers: {
-                'Accept': 'application/json',
-                'User-Agent': getRandomUserAgent()
-            }
-        });
+        const { ok, status, data: raw } = await chFetchJson(`${CH_API_BASE}/nodes/hosts`);
 
-        if (!res.ok) {
-            throw new Error(`Upstream returned HTTP ${res.status}`);
+        if (!ok) {
+            throw new Error(`Upstream returned HTTP ${status}`);
         }
 
-        const raw = await res.json();
         const rawMap = (raw && typeof raw === 'object' && raw.nodes) ? raw.nodes : raw;
 
         if (!rawMap || typeof rawMap !== 'object' || Array.isArray(rawMap)) {
@@ -1488,9 +1435,6 @@ async function chHandleNodesRequest() {
     }
 }
 
-// GET /checkhost/check?type=<ping|http|tcp|udp|dns>&host=<host>&node=<id>&node=<id>&max_nodes=<n>
-// Starts a check on check-host.net and returns a normalized shape:
-// { ok, request_id, permanent_link, nodes: { hostId: {country, city, ip, asn, ...} } }
 async function chHandleCheckRequest(request) {
     const url = new URL(request.url);
     const type = url.searchParams.get('type');
@@ -1516,14 +1460,11 @@ async function chHandleCheckRequest(request) {
     }
 
     try {
-        const res = await fetch(upstream.toString(), {
-            headers: { 'Accept': 'application/json', 'User-Agent': getRandomUserAgent() }
-        });
-        const data = await res.json();
+        const { ok, status, data } = await chFetchJson(upstream.toString());
 
-        if (!res.ok || data.error) {
-            const message = Array.isArray(data.error) ? data.error.join(', ') : (data.error || `Upstream returned HTTP ${res.status}`);
-            return chJsonResponse({ ok: false, message }, res.ok ? 400 : 502);
+        if (!ok || data.error) {
+            const message = Array.isArray(data.error) ? data.error.join(', ') : (data.error || `Upstream returned HTTP ${status}`);
+            return chJsonResponse({ ok: false, message }, ok ? 400 : 502);
         }
 
         return chJsonResponse({
@@ -1537,10 +1478,6 @@ async function chHandleCheckRequest(request) {
     }
 }
 
-// GET /checkhost/result/<request_id>?type=<ping|http|tcp|udp|dns>
-// Returns { ok, finished, results: { hostId: NormalizedResult } } where every check
-// type is flattened into the same { status, message, time_ms, ...extra } shape,
-// so the frontend never has to branch on check-host.net's raw per-type formats.
 async function chHandleResultRequest(requestId, request) {
     if (!requestId || !/^[a-zA-Z0-9]+$/.test(requestId)) {
         return chJsonResponse({ ok: false, message: 'Invalid request id' }, 400);
@@ -1553,15 +1490,12 @@ async function chHandleResultRequest(requestId, request) {
     }
 
     try {
-        const res = await fetch(`${CH_API_BASE}/check-result-extended/${requestId}`, {
-            headers: { 'Accept': 'application/json', 'User-Agent': getRandomUserAgent() }
-        });
+        const { ok, status, data: raw } = await chFetchJson(`${CH_API_BASE}/check-result-extended/${requestId}`);
 
-        if (!res.ok) {
-            throw new Error(`Upstream returned HTTP ${res.status}`);
+        if (!ok) {
+            throw new Error(`Upstream returned HTTP ${status}`);
         }
 
-        const raw = await res.json();
         const results = {};
         let finished = true;
 
@@ -1595,7 +1529,6 @@ function chNormalizeNodeResult(type, nodeData) {
     }
 }
 
-// Raw shape: [[ [status, time_seconds, ip], ... ]] — one array of ping attempts per node.
 function chNormalizePingResult(nodeData) {
     const attemptsRaw = Array.isArray(nodeData[0]) ? nodeData[0] : [];
     const attempts = attemptsRaw.map(a => {
@@ -1626,7 +1559,6 @@ function chNormalizePingResult(nodeData) {
     };
 }
 
-// Raw shape: [[ok_flag(0|1), time_seconds, message, http_code, ip]]
 function chNormalizeHttpResult(nodeData) {
     const r = nodeData[0];
     if (!r) return { status: 'failed', message: 'No data returned', time_ms: null };
@@ -1641,7 +1573,6 @@ function chNormalizeHttpResult(nodeData) {
     };
 }
 
-// Raw shape: [{ address, port, time }] on success, or [{ error }] on failure.
 function chNormalizeTcpResult(nodeData) {
     const r = nodeData[0];
     if (!r) return { status: 'failed', message: 'No data returned', time_ms: null };
@@ -1656,7 +1587,6 @@ function chNormalizeTcpResult(nodeData) {
     };
 }
 
-// Raw shape: [{ time, ... }] on success, or [{ error }] on failure.
 function chNormalizeUdpResult(nodeData) {
     const r = nodeData[0];
     if (!r) return { status: 'failed', message: 'No data returned', time_ms: null };
@@ -1669,7 +1599,6 @@ function chNormalizeUdpResult(nodeData) {
     };
 }
 
-// Raw shape: [{ A: [...], AAAA: [...], NS: [...], MX: [...], TXT: [...], CNAME: [...] }]
 function chNormalizeDnsResult(nodeData) {
     const r = nodeData[0];
     if (!r) return { status: 'failed', message: 'No data returned', time_ms: null, records: {} };
