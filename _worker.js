@@ -758,7 +758,7 @@ const HTML_PAGE = `
                 let attempts = 0;
                 let resultData = { results: {} };
 
-                while (attempts < 15) {
+                while (attempts < 20) {
                     await new Promise(r => setTimeout(r, 1500));
                     const resultRes = await fetch('/checkhost/result/' + requestId);
                     resultData = await resultRes.json();
@@ -799,8 +799,10 @@ const HTML_PAGE = `
             let rows = '';
 
             nodeIds.forEach(nodeId => {
-                const info = nodesInfo[nodeId] || [];
-                const location = [info[2], info[1]].filter(Boolean).join(', ');
+                const info = nodesInfo[nodeId] || {};
+                const location = (info.city || info.country)
+                    ? [info.city, info.country].filter(Boolean).join(', ')
+                    : (Array.isArray(info) ? [info[2], info[1]].filter(Boolean).join(', ') : '-');
                 rows += \`
                     <tr class="border-b">
                         <td class="py-2 px-3 font-medium">\${location || '-'}</td>
@@ -1117,7 +1119,6 @@ async function fetchScamalyticsData(ip) {
             }
         }
     } catch (e) {
-    
     }
 
     const groupA = [
@@ -1130,7 +1131,6 @@ async function fetchScamalyticsData(ip) {
         const html = await raceProxies(groupA, 4000);
         return parseScamalyticsHTML(html, ip);
     } catch (eA) {
-        
         const groupB = [
             { name: 'ThingProxy', url: `https://thingproxy.freeboard.io/fetch/${targetUrl}` },
             { name: 'JSONPlaceholder Proxy', url: `https://jsonp.afeld.me/?url=${encodeURIComponent(targetUrl)}` }
@@ -1340,21 +1340,29 @@ function chNormalizeNodesMap(rawMap) {
 
     Object.keys(rawMap).forEach(hostId => {
         const entry = rawMap[hostId];
-        if (Array.isArray(entry)) {
+        if (entry && Array.isArray(entry.location)) {
+            nodes[hostId] = {
+                country_code: entry.location[0] || null,
+                country: entry.location[1] || null,
+                city: entry.location[2] || null,
+                ip: entry.ip || null,
+                asn: entry.asn ? String(entry.asn).trim() : null
+            };
+        } else if (Array.isArray(entry)) {
             nodes[hostId] = {
                 country_code: entry[0] || null,
                 country: entry[1] || null,
                 city: entry[2] || null,
                 ip: entry[3] || null,
-                asn: entry[4] || null
+                asn: entry[4] ? String(entry[4]).trim() : null
             };
         } else if (entry && typeof entry === 'object') {
             nodes[hostId] = {
-                country_code: entry.country_code || null,
-                country: entry.country || null,
+                country_code: entry.country_code || entry.country || null,
+                country: entry.country || entry.country_name || null,
                 city: entry.city || null,
                 ip: entry.ip || null,
-                asn: entry.asn || null
+                asn: entry.asn ? String(entry.asn).trim() : null
             };
         }
     });
@@ -1365,18 +1373,15 @@ function chNormalizeNodesMap(rawMap) {
 async function chFetchJson(url) {
     const res = await fetch(url, {
         headers: {
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'User-Agent': getRandomUserAgent(),
-            'Referer': 'https://check-host.net/',
-            'Origin': 'https://check-host.net'
+            'Accept': 'application/json',
+            'User-Agent': getRandomUserAgent()
         }
     });
 
     const contentType = res.headers.get('content-type') || '';
     const bodyText = await res.text();
 
-    if (!contentType.toLowerCase().includes('json')) {
+    if (!contentType.toLowerCase().includes('json') && !bodyText.trim().startsWith('{') && !bodyText.trim().startsWith('[')) {
         const snippet = bodyText.slice(0, 180).replace(/\s+/g, ' ').trim();
         throw new Error(`check-host.net returned a non-JSON response (HTTP ${res.status}): "${snippet}"`);
     }
@@ -1449,21 +1454,22 @@ async function chHandleCheckRequest(request) {
         return chJsonResponse({ ok: false, message: 'Missing "host" parameter' }, 400);
     }
 
-    const upstream = new URL(`${CH_API_BASE}/check-${type}`);
-    upstream.searchParams.set('host', host);
+    const queryParts = [`host=${encodeURIComponent(host)}`];
 
     if (nodes.length > 0) {
-        nodes.forEach(n => upstream.searchParams.append('node', n));
-    } else {
+        nodes.forEach(n => queryParts.push(`node=${encodeURIComponent(n)}`));
+    } else if (maxNodes) {
         const safeMaxNodes = Math.min(Math.max(parseInt(maxNodes, 10) || 3, 1), 10);
-        upstream.searchParams.set('max_nodes', String(safeMaxNodes));
+        queryParts.push(`max_nodes=${safeMaxNodes}`);
     }
 
-    try {
-        const { ok, status, data } = await chFetchJson(upstream.toString());
+    const upstreamUrl = `${CH_API_BASE}/check-${type}?${queryParts.join('&')}`;
 
-        if (!ok || data.error) {
-            const message = Array.isArray(data.error) ? data.error.join(', ') : (data.error || `Upstream returned HTTP ${status}`);
+    try {
+        const { ok, status, data } = await chFetchJson(upstreamUrl);
+
+        if (!ok || !data || data.error) {
+            const message = data && data.error ? (Array.isArray(data.error) ? data.error.join(', ') : data.error) : `Upstream returned HTTP ${status}`;
             return chJsonResponse({ ok: false, message }, ok ? 400 : 502);
         }
 
@@ -1479,142 +1485,21 @@ async function chHandleCheckRequest(request) {
 }
 
 async function chHandleResultRequest(requestId, request) {
-    if (!requestId || !/^[a-zA-Z0-9]+$/.test(requestId)) {
+    if (!requestId || !/^[a-zA-Z0-9_-]+$/.test(requestId)) {
         return chJsonResponse({ ok: false, message: 'Invalid request id' }, 400);
     }
 
-    const url = new URL(request.url);
-    const type = url.searchParams.get('type');
-    if (!type || !CH_ALLOWED_TYPES.includes(type)) {
-        return chJsonResponse({ ok: false, message: 'Invalid or missing "type" parameter. Allowed: ' + CH_ALLOWED_TYPES.join(', ') }, 400);
-    }
-
     try {
-        const { ok, status, data: raw } = await chFetchJson(`${CH_API_BASE}/check-result-extended/${requestId}`);
+        const { ok, status, data: raw } = await chFetchJson(`${CH_API_BASE}/check-result/${requestId}`);
 
         if (!ok) {
             throw new Error(`Upstream returned HTTP ${status}`);
         }
 
-        const results = {};
-        let finished = true;
-
-        Object.keys(raw || {}).forEach(hostId => {
-            const normalized = chNormalizeNodeResult(type, raw[hostId]);
-            if (normalized.status === 'pending') finished = false;
-            results[hostId] = normalized;
-        });
-
-        return chJsonResponse({ ok: true, finished, results });
+        return chJsonResponse({ ok: true, results: raw || {} });
     } catch (e) {
         return chJsonResponse({ ok: false, message: 'Failed to fetch Check-Host result: ' + (e.message || 'unknown error') }, 502);
     }
-}
-
-function chNormalizeNodeResult(type, nodeData) {
-    if (nodeData === null || nodeData === undefined) {
-        return { status: 'pending', message: 'Waiting for this node to report', time_ms: null };
-    }
-    try {
-        switch (type) {
-            case 'ping': return chNormalizePingResult(nodeData);
-            case 'http': return chNormalizeHttpResult(nodeData);
-            case 'tcp': return chNormalizeTcpResult(nodeData);
-            case 'udp': return chNormalizeUdpResult(nodeData);
-            case 'dns': return chNormalizeDnsResult(nodeData);
-            default: return { status: 'unknown', message: 'Unrecognized check type', time_ms: null };
-        }
-    } catch (e) {
-        return { status: 'error', message: 'Failed to parse result: ' + (e.message || 'unknown error'), time_ms: null };
-    }
-}
-
-function chNormalizePingResult(nodeData) {
-    const attemptsRaw = Array.isArray(nodeData[0]) ? nodeData[0] : [];
-    const attempts = attemptsRaw.map(a => {
-        const ok = a && a[0] === 'OK';
-        return {
-            status: ok ? 'ok' : 'timeout',
-            time_ms: (ok && typeof a[1] === 'number') ? Math.round(a[1] * 1000) : null,
-            ip: (a && a[2]) || null
-        };
-    });
-
-    const okAttempts = attempts.filter(a => a.status === 'ok');
-    const total = attempts.length;
-
-    let status = 'failed';
-    if (total > 0 && okAttempts.length === total) status = 'ok';
-    else if (okAttempts.length > 0) status = 'partial';
-
-    const avgTime = okAttempts.length
-        ? Math.round(okAttempts.reduce((sum, a) => sum + a.time_ms, 0) / okAttempts.length)
-        : null;
-
-    return {
-        status,
-        message: total > 0 ? `${okAttempts.length}/${total} replies received` : 'No response',
-        time_ms: avgTime,
-        attempts
-    };
-}
-
-function chNormalizeHttpResult(nodeData) {
-    const r = nodeData[0];
-    if (!r) return { status: 'failed', message: 'No data returned', time_ms: null };
-
-    const ok = r[0] === 1;
-    return {
-        status: ok ? 'ok' : 'failed',
-        message: r[2] || (ok ? 'OK' : 'Request failed'),
-        time_ms: typeof r[1] === 'number' ? Math.round(r[1] * 1000) : null,
-        http_code: (r[3] !== undefined && r[3] !== null) ? r[3] : null,
-        ip: r[4] || null
-    };
-}
-
-function chNormalizeTcpResult(nodeData) {
-    const r = nodeData[0];
-    if (!r) return { status: 'failed', message: 'No data returned', time_ms: null };
-    if (r.error) return { status: 'failed', message: r.error, time_ms: null };
-
-    return {
-        status: 'ok',
-        message: 'Connected',
-        time_ms: typeof r.time === 'number' ? Math.round(r.time * 1000) : null,
-        ip: r.address || null,
-        port: r.port || null
-    };
-}
-
-function chNormalizeUdpResult(nodeData) {
-    const r = nodeData[0];
-    if (!r) return { status: 'failed', message: 'No data returned', time_ms: null };
-    if (r.error) return { status: 'failed', message: r.error, time_ms: null };
-
-    return {
-        status: 'ok',
-        message: 'Response received',
-        time_ms: typeof r.time === 'number' ? Math.round(r.time * 1000) : null
-    };
-}
-
-function chNormalizeDnsResult(nodeData) {
-    const r = nodeData[0];
-    if (!r) return { status: 'failed', message: 'No data returned', time_ms: null, records: {} };
-
-    const records = {};
-    ['A', 'AAAA', 'NS', 'MX', 'TXT', 'CNAME', 'SOA'].forEach(key => {
-        if (r[key] && r[key].length) records[key] = r[key];
-    });
-
-    const hasAny = Object.keys(records).length > 0;
-    return {
-        status: hasAny ? 'ok' : 'failed',
-        message: hasAny ? 'Records resolved' : 'No records found',
-        time_ms: null,
-        records
-    };
 }
 
 function chJsonResponse(data, status = 200) {
