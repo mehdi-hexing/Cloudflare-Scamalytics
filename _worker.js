@@ -822,6 +822,27 @@ async function handleRequest(request) {
         return chHandleRequest(request, chSubPath);
     }
 
+    // Explicit condition-based route for domains: /api/domain/<domain> or
+    // ?domain=<domain>. This resolves the domain AND scores every IP
+    // server-side in one response, instead of only returning raw IP groups.
+    // The IP path stays exactly as before (/api/<ip> or ?api=<ip>) so
+    // existing API integrations aren't affected.
+    if (cleanPath.startsWith('api/domain/')) {
+        const domainTarget = cleanPath.substring('api/domain/'.length);
+        if (domainTarget && isValidDomain(domainTarget)) {
+            return handleFullDomainCheck(domainTarget);
+        }
+        return jsonResponse({ error: true, message: 'Invalid domain format', domain: domainTarget }, 400);
+    }
+
+    const domainParam = url.searchParams.get('domain');
+    if (domainParam) {
+        if (isValidDomain(domainParam)) {
+            return handleFullDomainCheck(domainParam);
+        }
+        return jsonResponse({ error: true, message: 'Invalid domain format', domain: domainParam }, 400);
+    }
+
     let target = null;
     
     if (cleanPath) {
@@ -978,22 +999,24 @@ async function handleDomainRequest(domain, request) {
     }
 }
 
-async function handleBatchIpsRequest(request) {
-    try {
-        const body = await request.json();
-        const ips = body.ips;
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-        if (!Array.isArray(ips) || ips.length === 0) {
-            return jsonResponse({ error: true, message: 'Invalid or empty ips array' }, 400);
-        }
+async function scoreIpList(ips) {
+    const results = [];
+    const chunkSize = 3;
 
-        const results = [];
-        const chunkSize = 10;
+    for (let i = 0; i < ips.length; i += chunkSize) {
+        const chunk = ips.slice(i, i + chunkSize);
 
-        for (let i = 0; i < ips.length; i += chunkSize) {
-            const chunk = ips.slice(i, i + chunkSize);
+        const chunkResults = await Promise.all(chunk.map(async (ip, idx) => {
+            // Stagger requests within the chunk so they don't all hit
+            // scamalytics.com (and the fallback proxies) at the exact
+            // same instant, which was triggering rate-limits/blocks.
+            await sleep(idx * 250);
 
-            const chunkResults = await Promise.all(chunk.map(async (ip) => {
+            for (let attempt = 0; attempt < 2; attempt++) {
                 try {
                     const data = await fetchScamalyticsData(ip);
                     return {
@@ -1003,16 +1026,72 @@ async function handleBatchIpsRequest(request) {
                         details: buildIpDetails(data)
                     };
                 } catch (err) {
+                    if (attempt === 0) {
+                        await sleep(500);
+                        continue;
+                    }
                     return {
                         ip: ip,
                         error: true,
                         message: 'Failed to fetch data for this IP'
                     };
                 }
-            }));
+            }
+        }));
 
-            results.push(...chunkResults);
+        results.push(...chunkResults);
+
+        // Brief pause between chunks to avoid back-to-back bursts.
+        if (i + chunkSize < ips.length) {
+            await sleep(400);
         }
+    }
+
+    return results;
+}
+
+async function handleFullDomainCheck(domain) {
+    try {
+        const resolveData = await resolveDomain(domain);
+
+        if (!resolveData.success || !resolveData.groups || resolveData.groups.length === 0) {
+            return jsonResponse({
+                error: true,
+                message: 'Could not resolve this domain to any IPv4/IPv6 address',
+                domain: domain
+            }, 404);
+        }
+
+        const allIps = resolveData.groups.flat();
+        const results = await scoreIpList(allIps);
+
+        return jsonResponse({
+            success: true,
+            domain: domain,
+            total_ips: resolveData.total_ips,
+            count: results.length,
+            results: results
+        });
+
+    } catch (error) {
+        return jsonResponse({
+            error: true,
+            message: error.message || 'Failed to check domain',
+            domain: domain
+        }, 500);
+    }
+}
+
+async function handleBatchIpsRequest(request) {
+    try {
+        const body = await request.json();
+        const ips = body.ips;
+
+        if (!Array.isArray(ips) || ips.length === 0) {
+            return jsonResponse({ error: true, message: 'Invalid or empty ips array' }, 400);
+        }
+
+        const results = await scoreIpList(ips);
 
         return jsonResponse({
             success: true,
@@ -1030,7 +1109,7 @@ async function fetchScamalyticsData(ip) {
     
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1800);
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
         
         const response = await fetch(targetUrl, {
             headers: {
