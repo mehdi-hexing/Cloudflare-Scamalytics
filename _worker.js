@@ -195,7 +195,7 @@ const HTML_PAGE = `
                         <h3 class="font-semibold text-sm sm:text-base text-gray-700">Countries</h3>
                         <button onclick="chResetNodeSelection()" class="text-xs px-2.5 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600">Reset</button>
                     </div>
-                    <p class="text-xs text-gray-400 mb-3">Pick one or more countries â€” each one is checked from every check-host.net node in that country.</p>
+                    <p class="text-xs text-gray-400 mb-3">Pick one or more countries — each one is checked from every check-host.net node in that country.</p>
 
                     <div class="relative">
                         <button
@@ -506,18 +506,15 @@ const HTML_PAGE = `
         }
 
         const CH_COUNTRIES = [
-            ['us', 'United States'], ['ca', 'Canada'], ['gb', 'United Kingdom'], ['de', 'Germany'],
-            ['fr', 'France'], ['nl', 'Netherlands'], ['ru', 'Russia'], ['ua', 'Ukraine'],
-            ['pl', 'Poland'], ['se', 'Sweden'], ['fi', 'Finland'], ['no', 'Norway'],
-            ['dk', 'Denmark'], ['it', 'Italy'], ['es', 'Spain'], ['ch', 'Switzerland'],
-            ['at', 'Austria'], ['be', 'Belgium'], ['cz', 'Czechia'], ['ro', 'Romania'],
-            ['bg', 'Bulgaria'], ['gr', 'Greece'], ['tr', 'Turkey'], ['il', 'Israel'],
-            ['ae', 'United Arab Emirates'], ['sa', 'Saudi Arabia'], ['ir', 'Iran'], ['in', 'India'],
-            ['cn', 'China'], ['jp', 'Japan'], ['kr', 'South Korea'], ['sg', 'Singapore'],
-            ['hk', 'Hong Kong'], ['tw', 'Taiwan'], ['vn', 'Vietnam'], ['th', 'Thailand'],
-            ['id', 'Indonesia'], ['my', 'Malaysia'], ['ph', 'Philippines'], ['au', 'Australia'],
-            ['br', 'Brazil'], ['mx', 'Mexico'], ['ar', 'Argentina'], ['za', 'South Africa'],
-            ['eg', 'Egypt'], ['kz', 'Kazakhstan']
+            ['at', 'Austria'], ['br', 'Brazil'], ['bg', 'Bulgaria'], ['ca', 'Canada'],
+            ['cy', 'Cyprus'], ['fi', 'Finland'], ['fr', 'France'], ['de', 'Germany'],
+            ['hk', 'Hong Kong'], ['hu', 'Hungary'], ['in', 'India'], ['id', 'Indonesia'],
+            ['ir', 'Iran'], ['il', 'Israel'], ['it', 'Italy'], ['jp', 'Japan'],
+            ['kz', 'Kazakhstan'], ['md', 'Moldova'], ['nl', 'Netherlands'], ['pl', 'Poland'],
+            ['pt', 'Portugal'], ['ro', 'Romania'], ['ru', 'Russia'], ['rs', 'Serbia'],
+            ['sg', 'Singapore'], ['si', 'Slovenia'], ['es', 'Spain'], ['se', 'Sweden'],
+            ['ch', 'Switzerland'], ['tr', 'Turkey'], ['gb', 'UK'], ['us', 'USA'],
+            ['ua', 'Ukraine'], ['vn', 'Vietnam']
         ];
 
         function switchTab(tab) {
@@ -893,9 +890,7 @@ async function handleDomainRequest(domain, request) {
             }, 404);
         }
 
-        const limitedIps = ips.slice(0, 10);
-
-        const results = await Promise.all(limitedIps.map(async (ip) => {
+        const results = await Promise.all(ips.map(async (ip) => {
             try {
                 const data = await fetchScamalyticsData(ip);
                 return {
