@@ -195,7 +195,7 @@ const HTML_PAGE = `
                         <h3 class="font-semibold text-sm sm:text-base text-gray-700">Countries</h3>
                         <button onclick="chResetNodeSelection()" class="text-xs px-2.5 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600">Reset</button>
                     </div>
-                    <p class="text-xs text-gray-400 mb-3">Pick one or more countries — each one is checked from every check-host.net node in that country.</p>
+                    <p class="text-xs text-gray-400 mb-3">Pick one or more countries â€” each one is checked from every check-host.net node in that country.</p>
 
                     <div class="relative">
                         <button
@@ -262,7 +262,7 @@ const HTML_PAGE = `
             }
         });
 
-        async function checkIP() {
+async function checkIP() {
             const rawInput = document.getElementById('ipInput').value.trim();
 
             if (!rawInput) {
@@ -285,16 +285,14 @@ const HTML_PAGE = `
             showLoading();
 
             try {
-                const response = await fetch(\`/api/\${rawInput}\`);
-                const data = await response.json();
+                if (inputIsIP) {
+                    const response = await fetch('/api/' + encodeURIComponent(rawInput));
+                    const data = await response.json();
 
-                if (!response.ok || data.error) {
-                    throw new Error(data.message || 'Failed to fetch data');
-                }
+                    if (!response.ok || data.error) {
+                        throw new Error(data.message || 'Failed to fetch data');
+                    }
 
-                if (Array.isArray(data.results)) {
-                    displayDomainResults(data.info.domain, data.results);
-                } else {
                     displayResults({
                         ip: data.info.ip,
                         fraudScore: data.info.fraud_score,
@@ -318,12 +316,91 @@ const HTML_PAGE = `
                             'Web Proxy': data.details.web_proxy || '-'
                         }
                     });
+                } else {
+                    const resolveRes = await fetch('/api/' + encodeURIComponent(rawInput));
+                    const resolveData = await resolveRes.json();
+
+                    if (!resolveData.success || !resolveData.groups || resolveData.groups.length === 0) {
+                        throw new Error(resolveData.message || 'No IP addresses found for this domain');
+                    }
+
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('error').classList.add('hidden');
+                    document.getElementById('results').classList.add('hidden');
+                    document.getElementById('domainResults').classList.remove('hidden');
+                    document.getElementById('domainName').textContent = rawInput;
+                    document.getElementById('domainIpCount').textContent = '0 / ' + resolveData.total_ips;
+                    document.getElementById('domainResultsList').innerHTML = '';
+
+                    let totalLoaded = 0;
+
+                    for (let g = 0; g < resolveData.groups.length; g++) {
+                        const groupIps = resolveData.groups[g];
+
+                        const batchRes = await fetch('/api/check-ips', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ips: groupIps })
+                        });
+
+                        const batchData = await batchRes.json();
+                        if (batchData.success && batchData.results) {
+                            appendDomainResults(batchData.results);
+                            totalLoaded += batchData.results.length;
+                            document.getElementById('domainIpCount').textContent = totalLoaded + ' / ' + resolveData.total_ips;
+                        }
+                    }
                 }
 
             } catch (error) {
                 console.error('Error:', error);
                 showError(error.message || 'Error fetching data. Please try again.');
             }
+        }
+
+        function appendDomainResults(results) {
+            const listDiv = document.getElementById('domainResultsList');
+
+            results.forEach(item => {
+                if (item.error) {
+                    listDiv.innerHTML += \`
+                        <div class="bg-red-50 border-2 border-red-200 rounded-xl p-3 sm:p-4">
+                            <p class="font-semibold text-red-700 text-sm break-all">\${item.ip || 'Unknown IP'}</p>
+                            <p class="text-xs text-red-500 mt-1">\${item.message || 'Failed to fetch data for this IP'}</p>
+                        </div>
+                    \`;
+                    return;
+                }
+
+                const score = item.fraud_score || 0;
+                let riskClass = 'risk-low';
+                if (score > 75) riskClass = 'risk-very-high';
+                else if (score > 50) riskClass = 'risk-high';
+                else if (score > 25) riskClass = 'risk-medium';
+
+                const details = item.details || {};
+                const country = ((details.country || '-') + ' ' + (details.flag || '')).trim();
+                const isp = details.isp || details.organization || '-';
+
+                listDiv.innerHTML += \`
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100 mb-3">
+                        <div class="flex flex-col sm:flex-row">
+                            <div class="\${riskClass} text-white p-3 sm:p-4 sm:w-36 flex flex-col items-center justify-center text-center">
+                                <div class="text-2xl sm:text-3xl font-bold">\${score}</div>
+                                <div class="text-xs opacity-90">\${translateRiskFromEnglish(item.risk)}</div>
+                            </div>
+                            <div class="p-3 sm:p-4 flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs sm:text-sm">
+                                <div class="break-all"><span class="text-gray-500">IP:</span> <span class="font-semibold">\${item.ip}</span></div>
+                                <div class="truncate"><span class="text-gray-500">Country:</span> <span class="font-semibold">\${country}</span></div>
+                                <div class="truncate"><span class="text-gray-500">ISP:</span> <span class="font-semibold">\${isp}</span></div>
+                                <div><span class="text-gray-500">VPN:</span> <span class="font-semibold">\${details.vpn || '-'}</span></div>
+                                <div><span class="text-gray-500">Tor:</span> <span class="font-semibold">\${details.tor || '-'}</span></div>
+                                <div><span class="text-gray-500">Datacenter:</span> <span class="font-semibold">\${details.datacenter || '-'}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                \`;
+            });
         }
 
         function translateRiskFromEnglish(englishRisk) {
@@ -724,26 +801,22 @@ const HTML_PAGE = `
 </body>
 </html>`;
 
-addEventListener('fetch', event => {
-    event.respondWith(handleRequest(event.request));
-});
-
 export default {
     async fetch(request, env, ctx) {
         return handleRequest(request);
     }
 };
 
-export async function onRequest(context) {
-    return handleRequest(context.request);
-}
-
 async function handleRequest(request) {
     const url = new URL(request.url);
     const path = url.pathname;
     
     const cleanPath = path.replace(/^\/+|\/+$/g, '');
-
+    
+    if (request.method === 'POST' && (cleanPath === 'api/check-ips' || cleanPath === 'check-ips')) {
+        return handleBatchIpsRequest(request);
+    }
+    
     if (cleanPath === 'checkhost' || cleanPath.startsWith('checkhost/')) {
         const chSubPath = cleanPath === 'checkhost' ? '' : cleanPath.substring('checkhost/'.length);
         return chHandleRequest(request, chSubPath);
@@ -862,27 +935,31 @@ function buildIpDetails(data) {
     };
 }
 
-async function handleDomainRequest(domain, request) {
-    const cacheUrl = new URL(request.url);
-    cacheUrl.pathname = `/domain-cache/${domain}`;
-    cacheUrl.search = '';
-    const cacheKey = new Request(cacheUrl.toString(), { method: 'GET' });
-    const cache = caches.default;
+const RENDER_RESOLVER_API = 'https://domain-resolve.onrender.com';
 
-    let cachedResponse = await cache.match(cacheKey);
-    if (cachedResponse) {
-        const responseHeaders = new Headers(cachedResponse.headers);
-        responseHeaders.set('X-Cache', 'HIT');
-        return new Response(cachedResponse.body, {
-            status: cachedResponse.status,
-            headers: responseHeaders
-        });
-    }
-
+async function resolveDomain(domain) {
     try {
-        const ips = await resolveDomain(domain);
+        const targetUrl = `${RENDER_RESOLVER_API}/resolve?domain=${encodeURIComponent(domain)}`;
+        const response = await fetch(targetUrl, {
+            headers: { 'Accept': 'application/json' }
+        });
 
-        if (!ips || ips.length === 0) {
+        if (!response.ok) {
+            return { success: false, total_ips: 0, total_groups: 0, groups: [] };
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (e) {
+        return { success: false, total_ips: 0, total_groups: 0, groups: [] };
+    }
+}
+
+async function handleDomainRequest(domain, request) {
+    try {
+        const resolveData = await resolveDomain(domain);
+
+        if (!resolveData.success || !resolveData.groups || resolveData.groups.length === 0) {
             return jsonResponse({
                 error: true,
                 message: 'Could not resolve this domain to any IPv4/IPv6 address',
@@ -890,40 +967,7 @@ async function handleDomainRequest(domain, request) {
             }, 404);
         }
 
-        const results = await Promise.all(ips.map(async (ip) => {
-            try {
-                const data = await fetchScamalyticsData(ip);
-                return {
-                    ip: data.ip,
-                    fraud_score: data.fraudScore,
-                    risk: data.risk,
-                    details: buildIpDetails(data)
-                };
-            } catch (err) {
-                return {
-                    ip: ip,
-                    error: true,
-                    message: err.message || 'Failed to fetch data for this IP'
-                };
-            }
-        }));
-
-        const apiResponse = {
-            info: {
-                success: true,
-                domain: domain,
-                resolved_count: results.length
-            },
-            results: results
-        };
-
-        const finalResponse = jsonResponse(apiResponse);
-        finalResponse.headers.set('X-Cache', 'MISS');
-        finalResponse.headers.set('Cache-Control', 'public, max-age=3600');
-
-        await cache.put(cacheKey, finalResponse.clone());
-
-        return finalResponse;
+        return jsonResponse(resolveData);
 
     } catch (error) {
         return jsonResponse({
@@ -934,23 +978,51 @@ async function handleDomainRequest(domain, request) {
     }
 }
 
-async function resolveDomain(domain) {
-    const doh = (type) => fetch(
-        `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=${type}`,
-        { headers: { 'Accept': 'application/dns-json' } }
-    ).then(res => res.ok ? res.json() : { Answer: [] }).catch(() => ({ Answer: [] }));
+async function handleBatchIpsRequest(request) {
+    try {
+        const body = await request.json();
+        const ips = body.ips;
 
-    const [aData, aaaaData] = await Promise.all([doh('A'), doh('AAAA')]);
+        if (!Array.isArray(ips) || ips.length === 0) {
+            return jsonResponse({ error: true, message: 'Invalid or empty ips array' }, 400);
+        }
 
-    const ips = [];
-    (aData.Answer || []).forEach(record => {
-        if (record.type === 1 && isValidIP(record.data)) ips.push(record.data);
-    });
-    (aaaaData.Answer || []).forEach(record => {
-        if (record.type === 28 && isValidIP(record.data)) ips.push(record.data);
-    });
+        const results = [];
+        const chunkSize = 10;
 
-    return [...new Set(ips)];
+        for (let i = 0; i < ips.length; i += chunkSize) {
+            const chunk = ips.slice(i, i + chunkSize);
+
+            const chunkResults = await Promise.all(chunk.map(async (ip) => {
+                try {
+                    const data = await fetchScamalyticsData(ip);
+                    return {
+                        ip: data.ip,
+                        fraud_score: data.fraudScore,
+                        risk: data.risk,
+                        details: buildIpDetails(data)
+                    };
+                } catch (err) {
+                    return {
+                        ip: ip,
+                        error: true,
+                        message: 'Failed to fetch data for this IP'
+                    };
+                }
+            }));
+
+            results.push(...chunkResults);
+        }
+
+        return jsonResponse({
+            success: true,
+            count: results.length,
+            results: results
+        });
+
+    } catch (err) {
+        return jsonResponse({ error: true, message: 'Failed to process batch' }, 500);
+    }
 }
 
 async function fetchScamalyticsData(ip) {
