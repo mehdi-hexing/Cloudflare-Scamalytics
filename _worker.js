@@ -188,6 +188,7 @@ const HTML_PAGE = `
                         Run Check
                     </button>
                 </div>
+                <p class="text-xs sm:text-sm text-purple-600 mb-2 break-words">API Endpoint: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/checkhost/us/example.com</code> (type any two-letter country code directly in the URL)</p>
 
                 <div class="pt-2">
                     <div class="flex justify-between items-center mb-2">
@@ -1185,7 +1186,32 @@ async function chHandleRequest(request, chSubPath) {
     if (chSubPath === 'check') {
         return chHandleCheckRequest(request);
     }
+
+    const parts = chSubPath.split('/').filter(Boolean);
+    if (parts.length >= 2) {
+        const country = parts[0];
+        const host = parts.slice(1).join('/');
+        return chHandleDirectRequest(country, host);
+    }
+
     return chJsonResponse({ ok: false, message: 'Unknown Check-Host endpoint' }, 404);
+}
+
+async function chHandleDirectRequest(country, host) {
+    if (!country || !/^[a-zA-Z]{2,3}$/.test(country)) {
+        return chJsonResponse({ ok: false, message: 'Invalid country code format (expected e.g. "us", "de", "ir")' }, 400);
+    }
+    if (!host) {
+        return chJsonResponse({ ok: false, message: 'Missing host' }, 400);
+    }
+
+    const result = await chCheckSingleCountry(host, country.toLowerCase());
+
+    if (!result.ok) {
+        return chJsonResponse({ ok: false, message: result.message, country: country.toLowerCase(), host }, 502);
+    }
+
+    return chJsonResponse({ ok: true, ...result.data });
 }
 
 async function chHandleCheckRequest(request) {
@@ -1202,7 +1228,7 @@ async function chHandleCheckRequest(request) {
 
     const limitedCountries = countries.slice(0, 10);
 
-    const results = await Promise.all(limitedCountries.map(country => chCheckSingleCountry(host, country)));
+    const results = await Promise.all(limitedCountries.map(country => chCheckSingleCountry(host, country.toLowerCase())));
 
     return chJsonResponse({ ok: true, host, results });
 }
@@ -1267,4 +1293,4 @@ function chJsonResponse(data, status = 200) {
             'Access-Control-Allow-Headers': 'Content-Type',
         }
     });
-            }
+}
