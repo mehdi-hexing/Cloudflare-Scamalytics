@@ -90,8 +90,8 @@ const HTML_PAGE = `
                     Check
                 </button>
             </div>
-            <p class="text-xs sm:text-sm text-gray-500 mt-3">You can also use URL parameter: ?ip=8.8.8.8</p>
-            <p class="text-xs sm:text-sm text-blue-600 mt-2 break-words">API Endpoints: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/8.8.8.8</code>, <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/api/example.com</code></p>
+            <p class="text-xs sm:text-sm text-gray-500 mt-3">You can also use URL parameters: ?ip=8.8.8.8 or ?domain=example.com</p>
+            <p class="text-xs sm:text-sm text-blue-600 mt-2 break-words">API Endpoints: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/8.8.8.8</code>, <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/api/domain/example.com</code> (full risk check)</p>
         </div>
 
         <div id="loading" class="hidden text-center py-12">
@@ -249,9 +249,13 @@ const HTML_PAGE = `
         window.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             const paramIP = urlParams.get('ip');
-            
+            const paramDomain = urlParams.get('domain');
+
             if (paramIP) {
                 document.getElementById('ipInput').value = paramIP;
+                checkIP();
+            } else if (paramDomain) {
+                document.getElementById('ipInput').value = paramDomain;
                 checkIP();
             }
         });
@@ -279,7 +283,13 @@ async function checkIP() {
             }
 
             const url = new URL(window.location);
-            url.searchParams.set('ip', rawInput);
+            if (inputIsIP) {
+                url.searchParams.delete('domain');
+                url.searchParams.set('ip', rawInput);
+            } else {
+                url.searchParams.delete('ip');
+                url.searchParams.set('domain', rawInput);
+            }
             window.history.pushState({}, '', url);
 
             showLoading();
