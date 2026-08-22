@@ -935,14 +935,33 @@ export default {
     }
 };
 
+// Safe decodeURIComponent: falls back to the original string on a
+// malformed sequence (e.g. a lone "%") instead of throwing and 500-ing
+// the whole request.
+function safeDecodeURIComponent(s) {
+    try {
+        return decodeURIComponent(s);
+    } catch (e) {
+        return s;
+    }
+}
+
 async function handleRequest(request) {
     const url = new URL(request.url);
     const path = url.pathname;
     
-    // Path segments legally contain unencoded IPv6 colons (e.g.
-    // "/2606:4700:4700::1111"), so no extra decoding is needed here -
-    // just strip any "[...]"/"%zone" a client might have included.
-    const cleanPath = stripIPBrackets(path.replace(/^\/+|\/+$/g, ''));
+    // `URL.pathname` does NOT decode percent-escapes (unlike
+    // URLSearchParams, which decodes query params automatically). A
+    // client that does `fetch('/api/' + encodeURIComponent(ipv6))` -
+    // which is the correct, generic thing to do, since it also has to
+    // handle domains with reserved characters - ends up sending literal
+    // "%3A" for every ":" in an IPv6 address. Decode once up front so
+    // both "/2001:db8::1" (typed straight into the address bar) and
+    // "/api/2001%3Adb8%3A%3A1" (sent via fetch+encodeURIComponent) reach
+    // the same, correctly-validated target instead of the encoded form
+    // falling through every isValidIP/isValidDomain check and silently
+    // returning the HTML page instead of JSON.
+    const cleanPath = stripIPBrackets(safeDecodeURIComponent(path.replace(/^\/+|\/+$/g, '')));
     
     if (request.method === 'POST' && (cleanPath === 'api/check-ips' || cleanPath === 'check-ips')) {
         return handleBatchIpsRequest(request);
