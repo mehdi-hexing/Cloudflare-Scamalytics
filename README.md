@@ -64,6 +64,31 @@ countries per request on the `check` endpoint.
 | `domain` | domain name | resolves and scores every IP |
 | `api` | IP or domain (legacy) | auto-detects type; domain returns raw groups, not scores |
 
+## IPv6 support
+
+IPv4 and IPv6 are treated as first-class, everywhere:
+
+- Every entry point (`/<ip>`, `/api/<ip>`, `?ip=`, `?api=`, `POST /api/check-ips`,
+  `/checkhost/<country>/<host>`) accepts IPv6 addresses in any valid textual
+  form, including bracketed (`[2606:4700:4700::1111]`, `[::1]:443`) and
+  link-local with a zone ID (`fe80::1%eth0` - the zone ID is stripped, since
+  it's only meaningful locally and scamalytics.com can't resolve it).
+- Every valid IPv6 address is normalized to its RFC 5952 canonical form
+  (lowercase, shortest `::` compression, `::ffff:a.b.c.d` for IPv4-mapped
+  addresses) before it's used to build the outbound scamalytics.com URL, the
+  edge cache key, or the JSON response. This means `2001:0DB8::1`,
+  `2001:db8:0:0:0:0:0:1` and `2001:db8::1` all hit the same cache entry and
+  render identically, instead of being scored/cached three separate times.
+- Domain and batch scoring (`/api/domain/<domain>`, `POST /api/check-ips`)
+  de-duplicate the IP list by canonical form first, so a resolver returning
+  the same IPv6 address in two different textual forms only gets scored
+  once.
+- API responses include an `ip_version` field (`4` or `6`) per IP, and the
+  web UI shows an IPv4/IPv6 badge next to every address.
+- Malformed entries in a batch request are reported back individually
+  (`"error": true, "message": "Invalid IP address format"`) instead of
+  failing the whole batch.
+
 ## Notes
 
 - Scoring scrapes scamalytics.com with public proxies as fallback, so it can
