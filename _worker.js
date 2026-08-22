@@ -80,7 +80,7 @@ const HTML_PAGE = `
                 <input 
                     type="text" 
                     id="ipInput" 
-                    placeholder="Enter IP or domain, e.g. 8.8.8.8, example.com"
+                    placeholder="Enter IPv4, IPv6 or domain, e.g. 8.8.8.8, 2606:4700:4700::1111, example.com"
                     class="w-full flex-1 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
                 />
                 <button 
@@ -90,7 +90,7 @@ const HTML_PAGE = `
                     Check
                 </button>
             </div>
-            <p class="text-xs sm:text-sm text-gray-500 mt-3">You can also use URL parameters: ?ip=8.8.8.8 or ?domain=example.com</p>
+            <p class="text-xs sm:text-sm text-gray-500 mt-3">You can also use URL parameters: ?ip=8.8.8.8, ?ip=2606:4700:4700::1111 (IPv6, brackets like [::1] are also accepted) or ?domain=example.com</p>
             <p class="text-xs sm:text-sm text-blue-600 mt-2 break-words">API Endpoints: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/8.8.8.8</code>, <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/api/domain/example.com</code> (full risk check)</p>
         </div>
 
@@ -252,7 +252,7 @@ const HTML_PAGE = `
             const paramDomain = urlParams.get('domain');
 
             if (paramIP) {
-                document.getElementById('ipInput').value = paramIP;
+                document.getElementById('ipInput').value = stripIPBrackets(paramIP);
                 checkIP();
             } else if (paramDomain) {
                 document.getElementById('ipInput').value = paramDomain;
@@ -267,20 +267,27 @@ const HTML_PAGE = `
         });
 
 async function checkIP() {
-            const rawInput = document.getElementById('ipInput').value.trim();
+            const typedInput = document.getElementById('ipInput').value.trim();
 
-            if (!rawInput) {
+            if (!typedInput) {
                 showError('Please enter an IP address or domain');
                 return;
             }
 
-            const inputIsIP = isValidIP(rawInput);
-            const inputIsDomain = !inputIsIP && isValidDomain(rawInput);
+            // Accepts pasted "[2606:4700:4700::1111]" / "[::1]:443" forms
+            // too, not just bare addresses.
+            const cleanedInput = stripIPBrackets(typedInput);
+            const inputIsIP = isValidIP(cleanedInput);
+            const inputIsDomain = !inputIsIP && isValidDomain(cleanedInput);
 
             if (!inputIsIP && !inputIsDomain) {
                 showError('Invalid IP address or domain format');
                 return;
             }
+
+            // Canonical form for IPv6 so the URL, the API call, and the
+            // cache key all agree regardless of how the address was typed.
+            const rawInput = inputIsIP ? normalizeIP(cleanedInput) : cleanedInput;
 
             const url = new URL(window.location);
             if (inputIsIP) {
@@ -400,7 +407,7 @@ async function checkIP() {
                                 <div class="text-xs opacity-90">\${translateRiskFromEnglish(item.risk)}</div>
                             </div>
                             <div class="p-3 sm:p-4 flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs sm:text-sm">
-                                <div class="break-all"><span class="text-gray-500">IP:</span> <span class="font-semibold">\${item.ip}</span></div>
+                                <div class="break-all"><span class="text-gray-500">IP:</span> <span class="font-semibold">\${item.ip}\${ipVersionBadge(item.ip)}</span></div>
                                 <div class="truncate"><span class="text-gray-500">Country:</span> <span class="font-semibold">\${country}</span></div>
                                 <div class="truncate"><span class="text-gray-500">ISP:</span> <span class="font-semibold">\${isp}</span></div>
                                 <div><span class="text-gray-500">VPN:</span> <span class="font-semibold">\${details.vpn || '-'}</span></div>
@@ -425,6 +432,16 @@ async function checkIP() {
             return translations[englishRisk] || englishRisk;
         }
 
+        // Small "IPv4"/"IPv6" chip shown next to an address so mixed
+        // results (e.g. a domain with both A and AAAA records) are easy
+        // to tell apart at a glance.
+        function ipVersionBadge(ip) {
+            const version = getIPVersion(ip);
+            if (!version) return '';
+            const color = version === 6 ? 'bg-indigo-100 text-indigo-700' : 'bg-sky-100 text-sky-700';
+            return \`<span class="inline-block \${color} text-[10px] font-bold px-1.5 py-0.5 rounded ml-1.5 align-middle">IPv\${version}</span>\`;
+        }
+
         function displayResults(data) {
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('error').classList.add('hidden');
@@ -447,7 +464,7 @@ async function checkIP() {
             document.getElementById('fraudScore').textContent = data.fraudScore;
             document.getElementById('riskLevel').textContent = data.riskLevel;
 
-            document.getElementById('ipAddress').textContent = data.ip;
+            document.getElementById('ipAddress').innerHTML = data.ip + ipVersionBadge(data.ip);
             document.getElementById('country').textContent = data.details['Country Name'] || '-';
             document.getElementById('city').textContent = data.details['City'] || '-';
             document.getElementById('isp').textContent = data.details['ISP Name'] || data.details['ISP'] || data.details['Organization Name'] || '-';
@@ -543,7 +560,7 @@ async function checkIP() {
                                 <div class="text-xs opacity-90">\${translateRiskFromEnglish(item.risk)}</div>
                             </div>
                             <div class="p-3 sm:p-4 flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs sm:text-sm">
-                                <div class="break-all"><span class="text-gray-500">IP:</span> <span class="font-semibold">\${item.ip}</span></div>
+                                <div class="break-all"><span class="text-gray-500">IP:</span> <span class="font-semibold">\${item.ip}\${ipVersionBadge(item.ip)}</span></div>
                                 <div class="truncate"><span class="text-gray-500">Country:</span> <span class="font-semibold">\${country}</span></div>
                                 <div class="truncate"><span class="text-gray-500">ISP:</span> <span class="font-semibold">\${isp}</span></div>
                                 <div><span class="text-gray-500">VPN:</span> <span class="font-semibold">\${details.vpn || '-'}</span></div>
@@ -573,6 +590,107 @@ async function checkIP() {
 
         function isValidIP(ip) {
             return isValidIPv4(ip) || isValidIPv6(ip);
+        }
+
+        // Strips a "[addr]" / "[addr]:port" wrapper and a trailing
+        // "%zoneId" so pasted URLs/link-local addresses still validate.
+        function stripIPBrackets(input) {
+            let s = (input || '').trim();
+            if (s.startsWith('[')) {
+                const end = s.indexOf(']');
+                if (end !== -1) {
+                    const host = s.slice(1, end);
+                    const rest = s.slice(end + 1);
+                    if (!rest || rest.startsWith(':')) {
+                        s = host;
+                    }
+                }
+            }
+            if (s.includes(':')) {
+                const zoneIdx = s.indexOf('%');
+                if (zoneIdx !== -1) s = s.slice(0, zoneIdx);
+            }
+            return s;
+        }
+
+        function expandIPv6(ip) {
+            let addr = ip;
+            const ipv4TailMatch = addr.match(/(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})$/);
+            if (ipv4TailMatch) {
+                const embeddedIPv4 = ipv4TailMatch[1];
+                const parts = embeddedIPv4.split('.').map(Number);
+                const hi = ((parts[0] << 8) | parts[1]).toString(16);
+                const lo = ((parts[2] << 8) | parts[3]).toString(16);
+                addr = addr.slice(0, addr.length - embeddedIPv4.length) + hi + ':' + lo;
+            }
+
+            let head = addr, tail = '', hasDoubleColon = false;
+            if (addr.includes('::')) {
+                hasDoubleColon = true;
+                const idx = addr.indexOf('::');
+                head = addr.slice(0, idx);
+                tail = addr.slice(idx + 2);
+            }
+
+            const headParts = head.length ? head.split(':') : [];
+            const tailParts = tail.length ? tail.split(':') : [];
+
+            let groups;
+            if (hasDoubleColon) {
+                const missing = 8 - (headParts.length + tailParts.length);
+                groups = [...headParts, ...Array(Math.max(missing, 0)).fill('0'), ...tailParts];
+            } else {
+                groups = addr.split(':');
+            }
+            return groups.map(g => parseInt(g, 16));
+        }
+
+        // RFC 5952 canonical text form - same algorithm as the Worker
+        // backend, so the address shown/sent from the browser always
+        // matches the one the API normalizes to (and therefore the
+        // same cache entry).
+        function canonicalizeIPv6(ip) {
+            if (!isValidIPv6(ip)) return null;
+            const groups = expandIPv6(ip.toLowerCase());
+
+            const isV4Mapped = groups[0] === 0 && groups[1] === 0 && groups[2] === 0 &&
+                groups[3] === 0 && groups[4] === 0 && groups[5] === 0xffff;
+            if (isV4Mapped) {
+                const ipv4 = [groups[6] >> 8, groups[6] & 0xff, groups[7] >> 8, groups[7] & 0xff].join('.');
+                return '::ffff:' + ipv4;
+            }
+
+            const hextets = groups.map(g => g.toString(16));
+            let bestStart = -1, bestLen = 0, curStart = -1, curLen = 0;
+            for (let i = 0; i < 8; i++) {
+                if (groups[i] === 0) {
+                    if (curStart === -1) curStart = i;
+                    curLen++;
+                    if (curLen > bestLen) { bestLen = curLen; bestStart = curStart; }
+                } else {
+                    curStart = -1; curLen = 0;
+                }
+            }
+            if (bestLen < 2) bestStart = -1;
+            if (bestStart === -1) return hextets.join(':');
+
+            const before = hextets.slice(0, bestStart);
+            const after = hextets.slice(bestStart + bestLen);
+            return before.join(':') + '::' + after.join(':');
+        }
+
+        function normalizeIP(input) {
+            const stripped = stripIPBrackets(input);
+            if (isValidIPv6(stripped)) {
+                return canonicalizeIPv6(stripped) || stripped;
+            }
+            return stripped;
+        }
+
+        function getIPVersion(ip) {
+            if (isValidIPv6(ip)) return 6;
+            if (isValidIPv4(ip)) return 4;
+            return null;
         }
 
         function isValidIPv4(ip) {
@@ -821,7 +939,10 @@ async function handleRequest(request) {
     const url = new URL(request.url);
     const path = url.pathname;
     
-    const cleanPath = path.replace(/^\/+|\/+$/g, '');
+    // Path segments legally contain unencoded IPv6 colons (e.g.
+    // "/2606:4700:4700::1111"), so no extra decoding is needed here -
+    // just strip any "[...]"/"%zone" a client might have included.
+    const cleanPath = stripIPBrackets(path.replace(/^\/+|\/+$/g, ''));
     
     if (request.method === 'POST' && (cleanPath === 'api/check-ips' || cleanPath === 'check-ips')) {
         return handleBatchIpsRequest(request);
@@ -863,17 +984,19 @@ async function handleRequest(request) {
         }
         
         if (target && isValidIP(target)) {
-            return handleAPIRequest(target, request);
+            // Canonicalize so "2001:0DB8::1" and "2001:db8::1" always
+            // hit the same cache entry and render identically.
+            return handleAPIRequest(normalizeIP(target), request);
         }
         if (target && isValidDomain(target)) {
             return handleDomainRequest(target, request);
         }
     }
     
-    const apiParam = url.searchParams.get('api');
+    const apiParam = url.searchParams.get('api') ? stripIPBrackets(url.searchParams.get('api')) : null;
     if (apiParam) {
         if (isValidIP(apiParam)) {
-            return handleAPIRequest(apiParam, request);
+            return handleAPIRequest(normalizeIP(apiParam), request);
         }
         if (isValidDomain(apiParam)) {
             return handleDomainRequest(apiParam, request);
@@ -897,8 +1020,16 @@ async function handleAPIRequest(ip, request) {
         }, 400);
     }
 
+    // Normalize again defensively: callers may reach this function
+    // directly (batch/domain flows) without having gone through the
+    // routing layer's normalizeIP() call.
+    ip = normalizeIP(ip);
+
     const cacheUrl = new URL(request.url);
-    cacheUrl.pathname = `/api-cache/${ip}`;
+    // encodeURIComponent keeps the cache key well-formed regardless of
+    // IP family; it's an opaque key so encoding doesn't need to be
+    // reversible, only consistent.
+    cacheUrl.pathname = `/api-cache/${encodeURIComponent(ip)}`;
     cacheUrl.search = '';
     const cacheKey = new Request(cacheUrl.toString(), { method: 'GET' });
     const cache = caches.default;
@@ -947,6 +1078,7 @@ function buildIpDetails(data) {
     const flagEmoji = getFlagEmoji(countryCode);
 
     return {
+        ip_version: getIPVersion(data.ip),
         country: data.details['Country Name'] || null,
         country_code: countryCode,
         flag: flagEmoji,
@@ -1013,6 +1145,36 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Cleans a raw list of IP strings (from the domain resolver or a batch
+// request body) before scoring: strips brackets/zone IDs, canonicalizes
+// IPv6 so equivalent representations collapse to one entry, drops
+// anything that isn't a valid IPv4/IPv6 address, and de-duplicates.
+// Invalid entries are returned separately so callers can still report
+// them back to the user instead of silently dropping them.
+function sanitizeIpList(rawIps) {
+    const valid = [];
+    const invalid = [];
+    const seen = new Set();
+
+    for (const raw of rawIps) {
+        if (typeof raw !== 'string') {
+            invalid.push(raw);
+            continue;
+        }
+        const cleaned = stripIPBrackets(raw.trim());
+        if (!isValidIP(cleaned)) {
+            invalid.push(raw);
+            continue;
+        }
+        const normalized = normalizeIP(cleaned);
+        if (seen.has(normalized)) continue;
+        seen.add(normalized);
+        valid.push(normalized);
+    }
+
+    return { valid, invalid };
+}
+
 async function scoreIpList(ips) {
     const results = [];
     const chunkSize = 3;
@@ -1072,7 +1234,12 @@ async function handleFullDomainCheck(domain) {
             }, 404);
         }
 
-        const allIps = resolveData.groups.flat();
+        // The resolver may return the same address in more than one
+        // textual form (e.g. once from an A/AAAA lookup, once from a
+        // CDN edge list) - sanitizeIpList canonicalizes IPv6 and
+        // de-duplicates so we don't score (and rate-limit ourselves
+        // against scamalytics.com for) the same host twice.
+        const { valid: allIps } = sanitizeIpList(resolveData.groups.flat());
         const results = await scoreIpList(allIps);
 
         return jsonResponse({
@@ -1101,7 +1268,19 @@ async function handleBatchIpsRequest(request) {
             return jsonResponse({ error: true, message: 'Invalid or empty ips array' }, 400);
         }
 
-        const results = await scoreIpList(ips);
+        // Accepts a mix of IPv4 and IPv6 (bracketed or not) in the same
+        // request; canonicalizes and de-dupes before scoring.
+        const { valid, invalid } = sanitizeIpList(ips);
+
+        if (valid.length === 0) {
+            return jsonResponse({ error: true, message: 'No valid IPv4/IPv6 addresses in ips array', invalid }, 400);
+        }
+
+        const results = await scoreIpList(valid);
+
+        for (const bad of invalid) {
+            results.push({ ip: bad, error: true, message: 'Invalid IP address format' });
+        }
 
         return jsonResponse({
             success: true,
@@ -1295,6 +1474,138 @@ function isValidIPv6(ip) {
     return ipv6Regex.test(ip);
 }
 
+// --- IPv6-aware helpers -----------------------------------------------
+//
+// These make IPv6 handling consistent everywhere a raw user-supplied
+// string can turn into an IP: strip brackets/zone IDs a browser or user
+// might paste in (e.g. "[2606:4700:4700::1111]:443"), then reduce every
+// valid IPv6 address to its RFC 5952 canonical text form so that the
+// *same* address always produces the same cache key, the same outbound
+// scamalytics.com URL, and the same displayed value - regardless of
+// which equivalent form (uppercase, expanded, no "::", etc.) it was
+// typed or returned by the resolver in.
+
+// Strips a "[addr]" or "[addr]:port" wrapper and a trailing "%zoneId"
+// (link-local scope, e.g. "fe80::1%eth0") from a raw address string.
+// Safe to call on anything - IPv4, hostnames, or already-clean IPv6.
+function stripIPBrackets(input) {
+    let s = (input || '').trim();
+    if (s.startsWith('[')) {
+        const end = s.indexOf(']');
+        if (end !== -1) {
+            const host = s.slice(1, end);
+            const rest = s.slice(end + 1);
+            if (!rest || rest.startsWith(':')) {
+                s = host;
+            }
+        }
+    }
+    if (s.includes(':')) {
+        const zoneIdx = s.indexOf('%');
+        if (zoneIdx !== -1) s = s.slice(0, zoneIdx);
+    }
+    return s;
+}
+
+// Expands a validated IPv6 address into its 8 numeric hextet groups,
+// resolving "::" and any embedded IPv4 tail (e.g. "::ffff:1.2.3.4").
+function expandIPv6(ip) {
+    let addr = ip;
+
+    const ipv4TailMatch = addr.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+    if (ipv4TailMatch) {
+        const embeddedIPv4 = ipv4TailMatch[1];
+        const parts = embeddedIPv4.split('.').map(Number);
+        const hi = ((parts[0] << 8) | parts[1]).toString(16);
+        const lo = ((parts[2] << 8) | parts[3]).toString(16);
+        addr = addr.slice(0, addr.length - embeddedIPv4.length) + hi + ':' + lo;
+    }
+
+    let head = addr;
+    let tail = '';
+    let hasDoubleColon = false;
+
+    if (addr.includes('::')) {
+        hasDoubleColon = true;
+        const idx = addr.indexOf('::');
+        head = addr.slice(0, idx);
+        tail = addr.slice(idx + 2);
+    }
+
+    const headParts = head.length ? head.split(':') : [];
+    const tailParts = tail.length ? tail.split(':') : [];
+
+    let groups;
+    if (hasDoubleColon) {
+        const missing = 8 - (headParts.length + tailParts.length);
+        groups = [...headParts, ...Array(Math.max(missing, 0)).fill('0'), ...tailParts];
+    } else {
+        groups = addr.split(':');
+    }
+
+    return groups.map(g => parseInt(g, 16));
+}
+
+// Canonical (RFC 5952) text form of a valid IPv6 address: lowercase,
+// leading zeros in each group dropped, longest run of zero groups
+// compressed to "::" (leftmost run wins on a tie, runs of length 1
+// are never compressed), and IPv4-mapped addresses rendered with a
+// dotted-quad tail ("::ffff:a.b.c.d"). Returns null if `ip` isn't a
+// valid IPv6 address.
+function canonicalizeIPv6(ip) {
+    if (!isValidIPv6(ip)) return null;
+    const groups = expandIPv6(ip.toLowerCase());
+
+    const isV4Mapped = groups[0] === 0 && groups[1] === 0 && groups[2] === 0 &&
+        groups[3] === 0 && groups[4] === 0 && groups[5] === 0xffff;
+
+    if (isV4Mapped) {
+        const ipv4 = [groups[6] >> 8, groups[6] & 0xff, groups[7] >> 8, groups[7] & 0xff].join('.');
+        return '::ffff:' + ipv4;
+    }
+
+    const hextets = groups.map(g => g.toString(16));
+
+    let bestStart = -1, bestLen = 0, curStart = -1, curLen = 0;
+    for (let i = 0; i < 8; i++) {
+        if (groups[i] === 0) {
+            if (curStart === -1) curStart = i;
+            curLen++;
+            if (curLen > bestLen) { bestLen = curLen; bestStart = curStart; }
+        } else {
+            curStart = -1;
+            curLen = 0;
+        }
+    }
+    if (bestLen < 2) bestStart = -1;
+
+    if (bestStart === -1) {
+        return hextets.join(':');
+    }
+
+    const before = hextets.slice(0, bestStart);
+    const after = hextets.slice(bestStart + bestLen);
+    return before.join(':') + '::' + after.join(':');
+}
+
+// Normalizes any user- or resolver-supplied address string: strips
+// brackets/zone IDs, and canonicalizes if it's IPv6. IPv4 and anything
+// that isn't a valid IP is returned unchanged (bracket-stripped) so
+// callers can safely run every input through this before using it.
+function normalizeIP(input) {
+    const stripped = stripIPBrackets(input);
+    if (isValidIPv6(stripped)) {
+        return canonicalizeIPv6(stripped) || stripped;
+    }
+    return stripped;
+}
+
+function getIPVersion(ip) {
+    if (isValidIPv6(ip)) return 6;
+    if (isValidIPv4(ip)) return 4;
+    return null;
+}
+
 function isValidDomain(domain) {
     if (!domain || domain.length > 253) return false;
     const domainRegex = /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,}$/;
@@ -1361,6 +1672,12 @@ async function chHandleDirectRequest(country, host) {
         return chJsonResponse({ ok: false, message: 'Missing host' }, 400);
     }
 
+    // Normalizes a bracket-less IPv6 host straight out of the URL path
+    // (e.g. /checkhost/us/2606:4700:4700::1111) the same way the
+    // Scamalytics side does, so repeated checks of the same address in
+    // different textual forms share one cache entry.
+    host = normalizeIP(stripIPBrackets(host));
+
     const result = await chCheckSingleCountry(host, country.toLowerCase());
 
     if (!result.ok) {
@@ -1372,12 +1689,14 @@ async function chHandleDirectRequest(country, host) {
 
 async function chHandleCheckRequest(request) {
     const url = new URL(request.url);
-    const host = url.searchParams.get('host');
+    let host = url.searchParams.get('host');
     const countries = url.searchParams.getAll('country');
 
     if (!host) {
         return chJsonResponse({ ok: false, message: 'Missing "host" parameter' }, 400);
     }
+
+    host = normalizeIP(stripIPBrackets(host));
     if (countries.length === 0) {
         return chJsonResponse({ ok: false, message: 'Select at least one country' }, 400);
     }
