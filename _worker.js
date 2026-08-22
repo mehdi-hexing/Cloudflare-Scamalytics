@@ -961,7 +961,14 @@ async function handleRequest(request) {
     // the same, correctly-validated target instead of the encoded form
     // falling through every isValidIP/isValidDomain check and silently
     // returning the HTML page instead of JSON.
-    const cleanPath = stripIPBrackets(safeDecodeURIComponent(path.replace(/^\/+|\/+$/g, '')));
+    //
+    // NOTE: bracket-stripping deliberately happens *after* route
+    // prefixes ("api/", "api/domain/", "checkhost/") are peeled off
+    // below, on the extracted target only - not here on the whole path.
+    // stripIPBrackets only strips a "[...]" that's at the very start of
+    // the string, so running it on "api/[::1]" (prefix still attached)
+    // would silently do nothing and leave the brackets in place.
+    const cleanPath = safeDecodeURIComponent(path.replace(/^\/+|\/+$/g, ''));
     
     if (request.method === 'POST' && (cleanPath === 'api/check-ips' || cleanPath === 'check-ips')) {
         return handleBatchIpsRequest(request);
@@ -978,7 +985,7 @@ async function handleRequest(request) {
     // The IP path stays exactly as before (/api/<ip> or ?api=<ip>) so
     // existing API integrations aren't affected.
     if (cleanPath.startsWith('api/domain/')) {
-        const domainTarget = cleanPath.substring('api/domain/'.length);
+        const domainTarget = stripIPBrackets(cleanPath.substring('api/domain/'.length));
         if (domainTarget && isValidDomain(domainTarget)) {
             return handleFullDomainCheck(domainTarget);
         }
@@ -997,9 +1004,9 @@ async function handleRequest(request) {
     
     if (cleanPath) {
         if (cleanPath.startsWith('api/')) {
-            target = cleanPath.substring(4);
+            target = stripIPBrackets(cleanPath.substring(4));
         } else {
-            target = cleanPath;
+            target = stripIPBrackets(cleanPath);
         }
         
         if (target && isValidIP(target)) {
