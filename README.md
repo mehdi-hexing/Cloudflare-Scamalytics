@@ -50,11 +50,22 @@ Content-Type: application/json
 
 ```
 GET /checkhost/<country>/<host>
-GET /checkhost/check?host=<host>&country=<country>&country=<country>...
+GET /checkhost/<type>/<country>/<host>
+GET /checkhost/check?host=<host>&type=<type>&country=<country>&country=<country>...
 ```
+
+`type` is one of `ping`, `http`, `tcp`, `udp`, `dns` and defaults to `ping`
+when omitted (so the old `/checkhost/<country>/<host>` and
+`/checkhost/check?host=...&country=...` URLs keep working unchanged).
 
 `country` is a 2-3 letter country code (e.g. `us`, `de`, `ir`). Up to 10
 countries per request on the `check` endpoint.
+
+The web UI's "Check-Host Network Test" tab lets you pick a check type
+(Ping / HTTP / TCP / UDP / DNS) and one or more countries, and shows a
+results table with columns tailored to the selected type (e.g. HTTP code +
+response time for HTTP, open/closed + response time for TCP/UDP, record
+count for DNS).
 
 ## Query parameters
 
@@ -69,8 +80,9 @@ countries per request on the `check` endpoint.
 IPv4 and IPv6 are treated as first-class, everywhere:
 
 - Every entry point (`/<ip>`, `/api/<ip>`, `?ip=`, `?api=`, `POST /api/check-ips`,
-  `/checkhost/<country>/<host>`) accepts IPv6 addresses in any valid textual
-  form, including bracketed (`[2606:4700:4700::1111]`, `[::1]:443`) and
+  `/checkhost/<country>/<host>`, `/checkhost/<type>/<country>/<host>`) accepts
+  IPv6 addresses in any valid textual form, including bracketed
+  (`[2606:4700:4700::1111]`, `[::1]:443`) and
   link-local with a zone ID (`fe80::1%eth0` - the zone ID is stripped, since
   it's only meaningful locally and scamalytics.com can't resolve it).
 - Every valid IPv6 address is normalized to its RFC 5952 canonical form
@@ -96,3 +108,9 @@ IPv4 and IPv6 are treated as first-class, everywhere:
   IPs.
 - Domain scoring is throttled (small batches, staggered requests, one retry)
   to reduce blocking, so large domains take longer to fully score.
+- Check-Host results are proxied from a separate API
+  (`CH_RENDER_API_BASE` in `_worker.js`, defaults to
+  `https://check-host.onrender.com`) and cached at the edge per
+  country+host+type for 60 seconds. If that API is slow or down, the
+  affected country's card shows an error message instead of results for
+  other countries in the same request.
