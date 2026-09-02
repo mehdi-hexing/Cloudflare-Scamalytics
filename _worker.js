@@ -188,7 +188,12 @@ const HTML_PAGE = `
                         Run Check
                     </button>
                 </div>
-                <p class="text-xs sm:text-sm text-purple-600 mb-2 break-words">API Endpoint: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/checkhost/us/example.com</code> (type any two-letter country code directly in the URL)</p>
+                <p class="text-xs sm:text-sm text-purple-600 mb-2 break-words">API Endpoint: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/checkhost/ping/us/example.com</code> (type is optional and defaults to "ping": <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/checkhost/us/example.com</code> still works)</p>
+
+                <div class="pt-1 pb-3">
+                    <h3 class="font-semibold text-sm sm:text-base text-gray-700 mb-2">Check Type</h3>
+                    <div id="chTypeButtons" class="flex flex-wrap gap-2"></div>
+                </div>
 
                 <div class="pt-2">
                     <div class="flex justify-between items-center mb-2">
@@ -722,6 +727,30 @@ async function checkIP() {
             ['ua', 'Ukraine'], ['vn', 'Vietnam']
         ];
 
+        const CH_CHECK_TYPES = [
+            ['ping', 'Ping'], ['http', 'HTTP'], ['tcp', 'TCP'], ['udp', 'UDP'], ['dns', 'DNS']
+        ];
+        let chSelectedType = 'ping';
+
+        function chRenderTypeButtons() {
+            const container = document.getElementById('chTypeButtons');
+            container.innerHTML = CH_CHECK_TYPES.map(([code, label]) => \`
+                <button type="button" onclick="chSelectType('\${code}')" data-type="\${code}"
+                    class="ch-type-btn px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg font-semibold border-2 transition-colors \${code === chSelectedType ? 'bg-purple-600 border-purple-600 text-white' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}">
+                    \${label}
+                </button>
+            \`).join('');
+        }
+
+        function chSelectType(code) {
+            chSelectedType = code;
+            document.querySelectorAll('.ch-type-btn').forEach(btn => {
+                const active = btn.getAttribute('data-type') === code;
+                btn.className = 'ch-type-btn px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg font-semibold border-2 transition-colors ' +
+                    (active ? 'bg-purple-600 border-purple-600 text-white' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50');
+            });
+        }
+
         function switchTab(tab) {
             const scamBtn = document.getElementById('tabScamalyticsBtn');
             const chBtn = document.getElementById('tabCheckhostBtn');
@@ -744,6 +773,9 @@ async function checkIP() {
                 scamBtn.className = inactiveClass;
                 if (document.getElementById('chCountryOptionsList').children.length === 0) {
                     chRenderCountryOptions();
+                }
+                if (document.getElementById('chTypeButtons').children.length === 0) {
+                    chRenderTypeButtons();
                 }
             }
         }
@@ -834,6 +866,7 @@ async function checkIP() {
             try {
                 const params = new URLSearchParams();
                 params.set('host', host);
+                params.set('type', chSelectedType);
                 selectedCountries.forEach(c => params.append('country', c));
 
                 const res = await fetch('/checkhost/check?' + params.toString());
@@ -864,6 +897,35 @@ async function checkIP() {
             document.getElementById('chErrorMessage').textContent = message;
         }
 
+        function chColumnsForType(t) {
+            if (t === 'http') return ['Node', 'Status', 'Code', 'Time'];
+            if (t === 'tcp' || t === 'udp') return ['Node', 'Status', 'Time'];
+            if (t === 'dns') return ['Node', 'Status', 'Records'];
+            return ['Node', 'Status', 'Ping'];
+        }
+
+        function chExtraCells(t, n) {
+            if (t === 'http') {
+                const time = n.response_time_s != null ? Math.round(n.response_time_s * 1000) + ' ms' : '-';
+                return \`
+                    <td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700">\${n.http_code != null ? n.http_code : '-'}</td>
+                    <td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700">\${time}</td>
+                \`;
+            }
+            if (t === 'tcp' || t === 'udp') {
+                const time = n.time_s != null ? Math.round(n.time_s * 1000) + ' ms' : '-';
+                return \`<td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700">\${time}</td>\`;
+            }
+            if (t === 'dns') {
+                let count = 0;
+                if (n.records) {
+                    Object.values(n.records).forEach(list => { count += (list ? list.length : 0); });
+                }
+                return \`<td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700">\${count}</td>\`;
+            }
+            return \`<td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700">\${n.ping_ms != null ? n.ping_ms + ' ms' : '-'}</td>\`;
+        }
+
         function chDisplayResults(host, results) {
             document.getElementById('chLoading').classList.add('hidden');
             document.getElementById('chError').classList.add('hidden');
@@ -884,9 +946,11 @@ async function checkIP() {
                 }
 
                 const d = entry.data;
+                const checkType = d.check_type || chSelectedType;
                 const accessible = !!d.is_accessible;
                 const badgeClass = accessible ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
                 const badgeText = accessible ? 'Accessible' : 'Not accessible';
+                const columns = chColumnsForType(checkType);
 
                 let nodeRows = '';
                 Object.keys(d.details || {}).forEach(nodeId => {
@@ -896,7 +960,7 @@ async function checkIP() {
                         <tr class="border-b last:border-b-0">
                             <td class="py-1.5 px-2 text-xs sm:text-sm text-gray-600">\${nodeId}</td>
                             <td class="py-1.5 px-2 text-xs sm:text-sm font-semibold \${nodeOk ? 'text-green-600' : 'text-red-600'}">\${n.status || '-'}</td>
-                            <td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700">\${n.ping_ms != null ? n.ping_ms + ' ms' : '-'}</td>
+                            \${chExtraCells(checkType, n)}
                         </tr>
                     \`;
                 });
@@ -904,7 +968,7 @@ async function checkIP() {
                 listDiv.innerHTML += \`
                     <div class="border-2 border-gray-100 rounded-xl p-4">
                         <div class="flex items-center justify-between mb-1">
-                            <h4 class="font-bold text-gray-800">\${(d.country || entry.country).toUpperCase()}</h4>
+                            <h4 class="font-bold text-gray-800">\${(d.country || entry.country).toUpperCase()} <span class="text-xs font-normal text-gray-400">(\${checkType.toUpperCase()})</span></h4>
                             <span class="px-3 py-1 rounded-full text-xs font-semibold \${badgeClass}">\${badgeText}</span>
                         </div>
                         <p class="text-xs sm:text-sm text-gray-500 mb-3">\${d.nodes_checked || 0} node(s) checked for \${d.host || host}</p>
@@ -912,9 +976,7 @@ async function checkIP() {
                             <table class="w-full text-left">
                                 <thead>
                                     <tr class="border-b text-gray-500 text-xs">
-                                        <td class="py-1 px-2">Node</td>
-                                        <td class="py-1 px-2">Status</td>
-                                        <td class="py-1 px-2">Ping</td>
+                                        \${columns.map(c => \`<td class="py-1 px-2">\${c}</td>\`).join('')}
                                     </tr>
                                 </thead>
                                 <tbody>\${nodeRows}</tbody>
@@ -1674,6 +1736,7 @@ function jsonResponse(data, status = 200) {
 }
 
 const CH_RENDER_API_BASE = 'https://check-host.onrender.com';
+const CH_VALID_TYPES = ['ping', 'http', 'tcp', 'udp', 'dns'];
 
 async function chHandleRequest(request, chSubPath) {
     if (chSubPath === 'check') {
@@ -1681,16 +1744,27 @@ async function chHandleRequest(request, chSubPath) {
     }
 
     const parts = chSubPath.split('/').filter(Boolean);
+
+    if (parts.length >= 3 && CH_VALID_TYPES.includes(parts[0].toLowerCase())) {
+        const type = parts[0].toLowerCase();
+        const country = parts[1];
+        const host = parts.slice(2).join('/');
+        return chHandleDirectRequest(type, country, host);
+    }
+
     if (parts.length >= 2) {
         const country = parts[0];
         const host = parts.slice(1).join('/');
-        return chHandleDirectRequest(country, host);
+        return chHandleDirectRequest('ping', country, host);
     }
 
     return chJsonResponse({ ok: false, message: 'Unknown Check-Host endpoint' }, 404);
 }
 
-async function chHandleDirectRequest(country, host) {
+async function chHandleDirectRequest(type, country, host) {
+    if (!CH_VALID_TYPES.includes(type)) {
+        return chJsonResponse({ ok: false, message: `Invalid check type (expected one of: ${CH_VALID_TYPES.join(', ')})` }, 400);
+    }
     if (!country || !/^[a-zA-Z]{2,3}$/.test(country)) {
         return chJsonResponse({ ok: false, message: 'Invalid country code format (expected e.g. "us", "de", "ir")' }, 400);
     }
@@ -1699,12 +1773,12 @@ async function chHandleDirectRequest(country, host) {
     }
 
     // Normalizes a bracket-less IPv6 host straight out of the URL path
-    // (e.g. /checkhost/us/2606:4700:4700::1111) the same way the
+    // (e.g. /checkhost/ping/us/2606:4700:4700::1111) the same way the
     // Scamalytics side does, so repeated checks of the same address in
     // different textual forms share one cache entry.
     host = normalizeIP(stripIPBrackets(host));
 
-    const result = await chCheckSingleCountry(host, country.toLowerCase());
+    const result = await chCheckSingleCountry(host, country.toLowerCase(), type);
 
     if (!result.ok) {
         return chJsonResponse({ ok: false, message: result.message, country: country.toLowerCase(), host }, 502);
@@ -1717,9 +1791,13 @@ async function chHandleCheckRequest(request) {
     const url = new URL(request.url);
     let host = url.searchParams.get('host');
     const countries = url.searchParams.getAll('country');
+    const rawType = (url.searchParams.get('type') || 'ping').toLowerCase();
 
     if (!host) {
         return chJsonResponse({ ok: false, message: 'Missing "host" parameter' }, 400);
+    }
+    if (!CH_VALID_TYPES.includes(rawType)) {
+        return chJsonResponse({ ok: false, message: `Invalid "type" parameter (expected one of: ${CH_VALID_TYPES.join(', ')})` }, 400);
     }
 
     host = normalizeIP(stripIPBrackets(host));
@@ -1729,15 +1807,16 @@ async function chHandleCheckRequest(request) {
 
     const limitedCountries = countries.slice(0, 10);
 
-    const results = await Promise.all(limitedCountries.map(country => chCheckSingleCountry(host, country.toLowerCase())));
+    const results = await Promise.all(limitedCountries.map(country => chCheckSingleCountry(host, country.toLowerCase(), rawType)));
 
-    return chJsonResponse({ ok: true, host, results });
+    return chJsonResponse({ ok: true, host, type: rawType, results });
 }
 
-async function chCheckSingleCountry(host, country) {
+async function chCheckSingleCountry(host, country, type = 'ping') {
     const cacheUrl = new URL('https://cache.internal/checkhost-render');
     cacheUrl.searchParams.set('country', country);
     cacheUrl.searchParams.set('host', host);
+    cacheUrl.searchParams.set('type', type);
     const cacheKey = new Request(cacheUrl.toString(), { method: 'GET' });
     const cache = caches.default;
 
@@ -1747,7 +1826,7 @@ async function chCheckSingleCountry(host, country) {
         return { country, ok: true, data };
     }
 
-    const target = `${CH_RENDER_API_BASE}/${encodeURIComponent(country)}/${encodeURIComponent(host)}`;
+    const target = `${CH_RENDER_API_BASE}/api/${encodeURIComponent(type)}/${encodeURIComponent(country)}/${encodeURIComponent(host)}`;
 
     try {
         const res = await fetch(target, {
