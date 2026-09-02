@@ -200,7 +200,7 @@ const HTML_PAGE = `
                         <h3 class="font-semibold text-sm sm:text-base text-gray-700">Countries</h3>
                         <button onclick="chResetNodeSelection()" class="text-xs px-2.5 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600">Reset</button>
                     </div>
-                    <p class="text-xs text-gray-400 mb-3">Pick one or more countries â€” each one is checked from every check-host.net node in that country.</p>
+                    <p class="text-xs text-gray-400 mb-3">Pick one or more countries — each one is checked from every check-host.net node in that country.</p>
 
                     <div class="relative">
                         <button
@@ -900,15 +900,36 @@ async function checkIP() {
         function chColumnsForType(t) {
             if (t === 'http') return ['Node', 'Status', 'Code', 'Time'];
             if (t === 'tcp' || t === 'udp') return ['Node', 'Status', 'Time'];
-            if (t === 'dns') return ['Node', 'Status', 'Records'];
+            if (t === 'dns') return ['Node', 'Status', 'IPs'];
             return ['Node', 'Status', 'Ping'];
         }
 
-        function chExtraCells(t, n) {
+        const CH_STATUS_LABELS = {
+            ping: { OK: 'Reachable', FAIL: 'Unreachable', TIMEOUT: 'Timeout', UNKNOWN: 'Unknown' },
+            http: { OK: 'Reachable', FAIL: 'Failed', TIMEOUT: 'Timeout', UNKNOWN: 'Unknown' },
+            tcp: { OK: 'Open', FAIL: 'Closed', FILTERED: 'Open or filtered', TIMEOUT: 'Timeout', UNKNOWN: 'Unknown' },
+            udp: { OK: 'Open', FAIL: 'Closed', FILTERED: 'Open or filtered', TIMEOUT: 'Timeout', UNKNOWN: 'Unknown' },
+            dns: { OK: 'Resolved', FAIL: 'No records', TIMEOUT: 'Timeout', UNKNOWN: 'Unknown' },
+        };
+
+        function chStatusLabel(t, status) {
+            return (CH_STATUS_LABELS[t] && CH_STATUS_LABELS[t][status]) || status || '-';
+        }
+
+        function chStatusColorClass(status) {
+            if (status === 'OK') return 'text-green-600';
+            if (status === 'FILTERED') return 'text-yellow-600';
+            return 'text-red-600';
+        }
+
+        const CH_DNS_MAX_IPS_SHOWN = 5;
+
+        function chExtraCells(t, n, host) {
             if (t === 'http') {
                 const time = n.response_time_s != null ? Math.round(n.response_time_s * 1000) + ' ms' : '-';
+                const code = n.code_display || (n.http_code != null ? String(n.http_code) : '-');
                 return \`
-                    <td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700">\${n.http_code != null ? n.http_code : '-'}</td>
+                    <td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700">\${code}</td>
                     <td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700">\${time}</td>
                 \`;
             }
@@ -917,11 +938,22 @@ async function checkIP() {
                 return \`<td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700">\${time}</td>\`;
             }
             if (t === 'dns') {
-                let count = 0;
-                if (n.records) {
-                    Object.values(n.records).forEach(list => { count += (list ? list.length : 0); });
+                const ips = Array.isArray(n.ips) ? n.ips : [];
+                if (ips.length === 0) {
+                    return '<td class="py-1.5 px-2 text-xs sm:text-sm text-gray-400 align-top">-</td>';
                 }
-                return \`<td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700">\${count}</td>\`;
+                const shown = ips.slice(0, CH_DNS_MAX_IPS_SHOWN);
+                const truncated = ips.length > CH_DNS_MAX_IPS_SHOWN;
+                const resolveLink = \`/api/\${encodeURIComponent(host)}\`;
+                return \`
+                    <td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700 align-top">
+                        <div class="leading-relaxed">\${shown.join('<br>')}</div>
+                        \${truncated ? \`
+                            <div class="text-gray-400">...</div>
+                            <a href="\${resolveLink}" target="_blank" rel="noopener noreferrer" class="text-purple-600 hover:underline">See all \${ips.length} IPs &rarr;</a>
+                        \` : ''}
+                    </td>
+                \`;
             }
             return \`<td class="py-1.5 px-2 text-xs sm:text-sm text-gray-700">\${n.ping_ms != null ? n.ping_ms + ' ms' : '-'}</td>\`;
         }
@@ -955,12 +987,13 @@ async function checkIP() {
                 let nodeRows = '';
                 Object.keys(d.details || {}).forEach(nodeId => {
                     const n = d.details[nodeId] || {};
-                    const nodeOk = n.status === 'OK';
+                    const statusColor = chStatusColorClass(n.status);
+                    const statusLabel = chStatusLabel(checkType, n.status);
                     nodeRows += \`
                         <tr class="border-b last:border-b-0">
-                            <td class="py-1.5 px-2 text-xs sm:text-sm text-gray-600">\${nodeId}</td>
-                            <td class="py-1.5 px-2 text-xs sm:text-sm font-semibold \${nodeOk ? 'text-green-600' : 'text-red-600'}">\${n.status || '-'}</td>
-                            \${chExtraCells(checkType, n)}
+                            <td class="py-1.5 px-2 text-xs sm:text-sm text-gray-600 align-top">\${nodeId}</td>
+                            <td class="py-1.5 px-2 text-xs sm:text-sm font-semibold \${statusColor} align-top">\${statusLabel}</td>
+                            \${chExtraCells(checkType, n, d.host || host)}
                         </tr>
                     \`;
                 });
