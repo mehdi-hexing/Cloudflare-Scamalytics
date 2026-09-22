@@ -1,16 +1,6 @@
-name = "Cloudflare-scamalytics"
+name = "cloudflare-scamalytics"
 main = "worker.js"
 compatibility_date = "2024-09-23"
-
-# Required for the domain-check endpoint (/api/domain/<domain>) on large
-# domains: it splits the IP list into groups and re-enters the Worker as
-# fresh, independently-budgeted invocations instead of scoring hundreds of
-# IPs' worth of subrequests in one invocation. A plain HTTP fetch() back to
-# the Worker's own workers.dev/custom domain is blocked by Cloudflare
-# (error 1042, "Worker tried to fetch from another Worker on the same
-# zone"), so this has to be a Service Binding - a direct runtime call, not
-# an HTTP subrequest - pointing at this same Worker (the "service" value
-# must match "name" above).
 [[services]]
 binding = "SELF"
-service = "Cloudflare-scamalytics"
+service = "cloudflare-scamalytics"
