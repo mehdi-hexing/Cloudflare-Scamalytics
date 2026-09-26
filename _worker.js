@@ -1438,12 +1438,7 @@ async function scoreIpList(ips, origin) {
     }
 
     const results = [];
-    const dispatchConcurrency = 1; // the 6-simultaneous-connection cap is SHARED across
-    // this invocation and every child it calls via the SELF service binding, so
-    // dispatching groups in parallel here leaves each child fighting the parent
-    // (and its siblings) for the same shared pool of 6 slots. Dispatching one at a
-    // time keeps only 1 connection open at this level, leaving the full
-    // CONNECTION_SLOTS budget free for whichever child is currently running.
+    const dispatchConcurrency = 1; // shared 6-connection cap across self-fetch calls
     for (let i = 0; i < groups.length; i += dispatchConcurrency) {
         const batch = groups.slice(i, i + dispatchConcurrency);
         const batchResults = await Promise.all(batch.map(group => selfCheckGroup(origin, group)));
@@ -1576,9 +1571,7 @@ async function handleBatchIpsRequest(request) {
 // scored in parallel - and each attempt's own timeout only starts once it
 // actually has a slot, so a queued attempt is never charged for time spent
 // waiting.
-const CONNECTION_SLOTS = 4; // with dispatchConcurrency = 1, this leaves 1 (dispatch
-// link) + 4 (this group's own fetches) = 5 of the shared 6-connection cap in use,
-// keeping 1 spare slot of real headroom instead of sitting exactly on the limit
+const CONNECTION_SLOTS = 4; // headroom under the shared 6-connection cap
 let activeConnectionSlots = 0;
 const connectionSlotQueue = [];
 
