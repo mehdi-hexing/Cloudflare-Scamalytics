@@ -1442,7 +1442,19 @@ async function scoreIpList(ips, origin, gate) {
     }
 
     const results = [];
-    const dispatchConcurrency = 1; // shared 6-connection cap across self-fetch calls
+    // Each dispatched group is its own self-fetched invocation, which
+    // internally opens up to CONNECTION_SLOTS connections to
+    // scamalytics.com/its proxies. Running dispatchConcurrency groups in
+    // parallel therefore multiplies out to roughly
+    // dispatchConcurrency * CONNECTION_SLOTS simultaneous outbound
+    // requests hitting scamalytics.com and its mirrors at once - that
+    // total, not just this invocation's own 6-connection cap (which is
+    // what actually limits dispatchConcurrency itself), is what risks
+    // tripping scamalytics-side rate limiting if pushed too high. 3 is a
+    // conservative middle ground versus the old hardcoded 5 - it un-does
+    // most of the fully-serial (1-at-a-time) regression without pushing
+    // total concurrent load past what was working before.
+    const dispatchConcurrency = 3;
     for (let i = 0; i < groups.length; i += dispatchConcurrency) {
         const batch = groups.slice(i, i + dispatchConcurrency);
         const batchResults = await Promise.all(batch.map(group => selfCheckGroup(origin, group, gate)));
@@ -1575,7 +1587,14 @@ async function handleBatchIpsRequest(request, gate) {
 // scored in parallel - and each attempt's own timeout only starts once it
 // actually has a slot, so a queued attempt is never charged for time spent
 // waiting.
-const CONNECTION_SLOTS = 4; // headroom under the shared 6-connection cap
+// 3, not 4: with dispatchConcurrency now > 1 (see scoreIpList), several
+// of these gates can be running at once in sibling self-fetched
+// invocations, each independently trying to open CONNECTION_SLOTS
+// connections to scamalytics.com/its proxies. Keeping this at 3 bounds
+// that total concurrent load (dispatchConcurrency * CONNECTION_SLOTS)
+// to roughly what the old hardcoded dispatchConcurrency=5 produced,
+// rather than letting it grow unchecked.
+const CONNECTION_SLOTS = 3; // headroom under the shared 6-connection cap
 
 // A gate's state must NOT live at module scope: a Worker isolate is reused
 // across many unrelated incoming requests, so a single shared counter here
