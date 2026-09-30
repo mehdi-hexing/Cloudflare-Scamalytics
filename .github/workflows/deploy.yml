@@ -114,7 +114,7 @@ jobs:
           sed -i "s/^name = .*/name = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
           sed -i "s/^service = .*/service = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
 
-      - uses: cloudflare/wrangler-action@v3
+      - uses: cloudflare/wrangler-action@v7
         with:
           apiToken: ${{ env.CF_API_TOKEN }}
           accountId: ${{ env.CF_ACCOUNT_ID }}
@@ -170,7 +170,7 @@ jobs:
           sed -i "s/^name = .*/name = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
           sed -i "s/^service = .*/service = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
 
-      - uses: cloudflare/wrangler-action@v3
+      - uses: cloudflare/wrangler-action@v7
         with:
           apiToken: ${{ env.CF_API_TOKEN }}
           accountId: ${{ env.CF_ACCOUNT_ID }}
@@ -226,7 +226,7 @@ jobs:
           sed -i "s/^name = .*/name = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
           sed -i "s/^service = .*/service = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
 
-      - uses: cloudflare/wrangler-action@v3
+      - uses: cloudflare/wrangler-action@v7
         with:
           apiToken: ${{ env.CF_API_TOKEN }}
           accountId: ${{ env.CF_ACCOUNT_ID }}
