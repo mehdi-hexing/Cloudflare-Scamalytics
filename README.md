@@ -51,31 +51,68 @@ runs `wrangler deploy` for you. It supports deploying the same Worker to
 
 | Account | Secret names |
 |---|---|
-| Account 1 (always used) | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` |
+| Account 1 | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` |
 | Account 2 (optional) | `CLOUDFLARE_ACCOUNT_ID_2`, `CLOUDFLARE_API_TOKEN_2` |
 | Account 3 (optional) | `CLOUDFLARE_ACCOUNT_ID_3`, `CLOUDFLARE_API_TOKEN_3` |
 | Account 4 (optional) | `CLOUDFLARE_ACCOUNT_ID_4`, `CLOUDFLARE_API_TOKEN_4` |
 
 Each `CLOUDFLARE_API_TOKEN*` needs Workers Scripts **Edit** permission (and
 KV **Edit** if you rely on it) for its account. You only need to add the
-secrets for the accounts you actually plan to use - accounts 2-4 are
-skipped entirely if you don't check their box when running the workflow.
+secrets for the accounts you actually plan to use - an account is skipped
+entirely unless you tick its checkbox when running the workflow.
 
 **2. Run it:**
 
 - **Automatically** - every push to `main` that touches `worker.js` or
   `wrangler.toml` deploys to **account 1 only**.
-- **Manually** - go to *Actions → Deploy Worker → Run workflow*. You'll see:
-  - `worker_name` - optional override for the Worker's name (defaults to
-    whatever is in `wrangler.toml`).
-  - `deploy_account_2` / `deploy_account_3` / `deploy_account_4` - checkboxes.
-    Tick any of these to also deploy to that account using its secrets
-    above. Leave them unchecked to only deploy to account 1.
+- **Manually** - go to *Actions → Deploy Worker (Multi-Account) → Run
+  workflow*. You'll see:
+  - `account_1` / `account_2` / `account_3` / `account_4` - a checkbox for
+    every account. Tick the ones you want to deploy to (at least one is
+    required). You can give each account a friendly label with the
+    repository variables `CLOUDFLARE_ACCOUNT_LABEL`,
+    `CLOUDFLARE_ACCOUNT_2_LABEL`, and so on.
+  - `worker_name` - optional name for the Worker. If left empty, the
+    `WORKERNAME` secret (`WORKERNAME_2`, `WORKERNAME_3`, ... for the other
+    accounts) is used, then the name in `wrangler.toml`.
+  - `placement_mode` - `off`, `smart`, `region`, `host` or `hostname`, with
+    `placement_provider` (`aws` / `gcp` / `azure`), `placement_region`,
+    `placement_host` and `placement_hostname` as the matching values. The
+    chosen placement is written into `wrangler.toml` as a `[placement]`
+    section before deploying.
 
 Each checked account gets deployed to independently (in parallel), each
 using its own `CLOUDFLARE_ACCOUNT_ID*` / `CLOUDFLARE_API_TOKEN*` pair, and
-the run's logs print the resulting `*.workers.dev` URL for every account
+the run's summary prints the resulting `*.workers.dev` URL for every account
 that ran.
+
+Pushes don't have the manual inputs, so automatic deploys read placement
+from the optional secrets `PLACEMENT_MODE`, `PLACEMENT_PROVIDER`,
+`PLACEMENT_REGION`, `PLACEMENT_HOST` and `PLACEMENT_HOSTNAME`. Set them if
+you want a push to keep the placement you chose; otherwise the Worker is
+redeployed without one.
+
+### Using the Worker as an API from GitHub Actions workflows
+
+If you call this Worker as an API from GitHub Actions workflows (for
+example a scanner that checks thousands of IPs through `/api/<ip>`), a
+single Worker can end up under heavy load. To reduce the pressure on it:
+
+- **Create several Workers** (for example one per Cloudflare account using
+  the multi-account deploy above) and have the caller spread its requests
+  across all of them - in the scanner this means listing every Worker host
+  in the `RISK_API_HOST` secret, separated by commas or new lines.
+- **Set a placement for every one of those Workers, using a different
+  region for each** (`placement_mode = region`, for example
+  `aws:eu-central-1`, `aws:us-east-1` and `aws:ap-southeast-1`). One
+  workflow run applies the same placement to every account you tick, so run
+  it once per Worker: tick that account, pick its region, then repeat for
+  the next one.
+
+Without a placement, a Worker runs in the data center closest to whoever is
+calling it, so all requests coming from GitHub's runners tend to land in the
+same place. Pinning each Worker to its own region spreads the load and the
+outgoing requests across different locations.
 
 ## Routes
 

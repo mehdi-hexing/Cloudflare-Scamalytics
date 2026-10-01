@@ -1,4 +1,4 @@
-name: Deploy Worker
+name: Deploy Worker (Multi-Account)
 
 on:
   push:
@@ -8,246 +8,295 @@ on:
       - 'wrangler.toml'
   workflow_dispatch:
     inputs:
+      account_1:
+        description: "Deploy to Account 1 — rename this to your account's label, e.g. 'Deploy to Personal'"
+        required: false
+        type: boolean
+        default: true
+      account_2:
+        description: "Deploy to Account 2 — rename this to your account's label"
+        required: false
+        type: boolean
+        default: false
+      account_3:
+        description: "Deploy to Account 3 — rename this to your account's label"
+        required: false
+        type: boolean
+        default: false
+      account_4:
+        description: "Deploy to Account 4 — rename this to your account's label"
+        required: false
+        type: boolean
+        default: false
       worker_name:
-        description: 'Worker name (leave empty to use the name in wrangler.toml)'
+        description: "Optional: Worker name for this run (lowercase letters, digits, dashes). Empty = WORKERNAME secret, then the name in wrangler.toml"
         required: false
         type: string
-      deploy_account_2:
-        description: 'Also deploy to Cloudflare account #2'
+        default: ""
+      placement_mode:
+        description: "Optional: Worker Placement — off / smart / region / host / hostname"
         required: false
-        type: boolean
-        default: false
-      deploy_account_3:
-        description: 'Also deploy to Cloudflare account #3'
+        type: choice
+        options:
+          - "off"
+          - "smart"
+          - "region"
+          - "host"
+          - "hostname"
+        default: "off"
+      placement_provider:
+        description: "Only used when placement_mode = region: cloud provider"
         required: false
-        type: boolean
-        default: false
-      deploy_account_4:
-        description: 'Also deploy to Cloudflare account #4'
+        type: choice
+        options:
+          - "aws"
+          - "gcp"
+          - "azure"
+        default: "aws"
+      placement_region:
+        description: "Only used when placement_mode = region: region code, e.g. eu-central-1 (aws) / europe-west3 (gcp) / westeurope (azure)"
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: ""
+      placement_host:
+        description: "Only used when placement_mode = host: host:port probed over TCP, e.g. db.example.com:5432"
+        required: false
+        type: string
+        default: ""
+      placement_hostname:
+        description: "Only used when placement_mode = hostname: hostname probed over HTTP, e.g. api.example.com"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
 
 jobs:
-  account-1:
-    name: Deploy - Account 1
+  plan:
+    name: Plan - select accounts
     runs-on: ubuntu-latest
-    env:
-      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
-
-      - run: |
-          echo "::add-mask::${CF_API_TOKEN}"
-          echo "::add-mask::${CF_ACCOUNT_ID}"
-
-      - id: name
+      - name: Build account matrix
+        id: build
+        env:
+          EVENT: ${{ github.event_name }}
+          SEL_1: ${{ inputs.account_1 }}
+          SEL_2: ${{ inputs.account_2 }}
+          SEL_3: ${{ inputs.account_3 }}
+          SEL_4: ${{ inputs.account_4 }}
         run: |
-          set -euo pipefail
-          INPUT_NAME="${{ inputs.worker_name }}"
-          TOML_NAME=$(grep '^name' wrangler.toml | head -1 | sed -E 's/name\s*=\s*"(.*)"/\1/')
-          if [ -n "$INPUT_NAME" ]; then
-            FINAL_NAME="$INPUT_NAME"
+          ITEMS="[]"
+          add() { ITEMS=$(echo "$ITEMS" | jq --argjson n "$1" '. + [{"index": $n}]'); }
+
+          if [ "$EVENT" != "workflow_dispatch" ]; then
+            add 1
           else
-            FINAL_NAME="$TOML_NAME"
+            [ "$SEL_1" = "true" ] && add 1
+            [ "$SEL_2" = "true" ] && add 2
+            [ "$SEL_3" = "true" ] && add 3
+            [ "$SEL_4" = "true" ] && add 4
           fi
-          echo "worker_name=$FINAL_NAME" >> "$GITHUB_OUTPUT"
 
-      - run: |
-          sed -i "s/^name = .*/name = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
-          sed -i "s/^service = .*/service = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
+          if [ "$(echo "$ITEMS" | jq 'length')" = "0" ]; then
+            echo "::error::No Cloudflare account selected - tick at least one account checkbox and re-run."
+            exit 1
+          fi
 
-      - uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ env.CF_API_TOKEN }}
-          accountId: ${{ env.CF_ACCOUNT_ID }}
+          echo "matrix=$(echo "$ITEMS" | jq -c '{include: .}')" >> "$GITHUB_OUTPUT"
 
-      - env:
-          WORKER_NAME: ${{ steps.name.outputs.worker_name }}
+  deploy:
+    name: Deploy - Account ${{ matrix.index }}
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Resolve account credentials (#${{ matrix.index }})
+        id: account
+        env:
+          API_TOKEN: ${{ matrix.index == 1 && secrets.CLOUDFLARE_API_TOKEN || secrets[format('CLOUDFLARE_API_TOKEN_{0}', matrix.index)] }}
+          ACCOUNT_ID: ${{ matrix.index == 1 && secrets.CLOUDFLARE_ACCOUNT_ID || secrets[format('CLOUDFLARE_ACCOUNT_ID_{0}', matrix.index)] }}
+          ACCOUNT_LABEL: ${{ matrix.index == 1 && vars.CLOUDFLARE_ACCOUNT_LABEL || vars[format('CLOUDFLARE_ACCOUNT_{0}_LABEL', matrix.index)] }}
+        run: |
+          if [ -z "$API_TOKEN" ] || [ -z "$ACCOUNT_ID" ]; then
+            if [ "${{ matrix.index }}" = "1" ]; then
+              TOKEN_NAME="CLOUDFLARE_API_TOKEN"
+              ID_NAME="CLOUDFLARE_ACCOUNT_ID"
+            else
+              TOKEN_NAME="CLOUDFLARE_API_TOKEN_${{ matrix.index }}"
+              ID_NAME="CLOUDFLARE_ACCOUNT_ID_${{ matrix.index }}"
+            fi
+            echo "::error::Account #${{ matrix.index }} is selected but its $TOKEN_NAME / $ID_NAME secrets aren't set."
+            exit 1
+          fi
+          echo "::add-mask::$API_TOKEN"
+          echo "::add-mask::$ACCOUNT_ID"
+          LABEL="${ACCOUNT_LABEL:-Account ${{ matrix.index }}}"
+          echo "label=$LABEL" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve worker name
+        id: worker
+        env:
+          INPUT_NAME: ${{ inputs.worker_name }}
+          SECRET_NAME: ${{ matrix.index == 1 && secrets.WORKERNAME || secrets[format('WORKERNAME_{0}', matrix.index)] }}
         run: |
           set -euo pipefail
+          TOML_NAME=$(grep -m1 '^name' wrangler.toml | sed -E 's/name[[:space:]]*=[[:space:]]*"(.*)"/\1/')
+          NAME="${INPUT_NAME:-}"
+          if [ -z "$NAME" ]; then NAME="${SECRET_NAME:-}"; fi
+          if [ -z "$NAME" ]; then NAME="$TOML_NAME"; fi
+          NAME=$(echo "$NAME" | tr '[:upper:]' '[:lower:]')
+
+          if ! echo "$NAME" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$'; then
+            echo "::error::Invalid worker name '$NAME' - use lowercase letters, digits and dashes only (max 63 chars, no leading/trailing dash)."
+            exit 1
+          fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve placement
+        id: placementval
+        env:
+          INPUT_MODE: ${{ inputs.placement_mode }}
+          INPUT_PROVIDER: ${{ inputs.placement_provider }}
+          INPUT_REGION: ${{ inputs.placement_region }}
+          INPUT_HOST: ${{ inputs.placement_host }}
+          INPUT_HOSTNAME: ${{ inputs.placement_hostname }}
+          SECRET_MODE: ${{ secrets.PLACEMENT_MODE }}
+          SECRET_PROVIDER: ${{ secrets.PLACEMENT_PROVIDER }}
+          SECRET_REGION: ${{ secrets.PLACEMENT_REGION }}
+          SECRET_HOST: ${{ secrets.PLACEMENT_HOST }}
+          SECRET_HOSTNAME: ${{ secrets.PLACEMENT_HOSTNAME }}
+        run: |
+          set -euo pipefail
+          MODE="${INPUT_MODE:-${SECRET_MODE:-}}"
+          MODE="${MODE:-off}"
+          case "$MODE" in
+            off|smart|region|host|hostname) ;;
+            *) echo "::error::Unknown placement mode '$MODE' (use off, smart, region, host or hostname)."; exit 1 ;;
+          esac
+
+          PROVIDER="${INPUT_PROVIDER:-${SECRET_PROVIDER:-}}"
+          PROVIDER="${PROVIDER:-aws}"
+          case "$PROVIDER" in
+            aws|gcp|azure) ;;
+            *) echo "::error::Unknown placement provider '$PROVIDER' (use aws, gcp or azure)."; exit 1 ;;
+          esac
+
+          REGION="${INPUT_REGION:-${SECRET_REGION:-}}"
+          HOST_VALUE="${INPUT_HOST:-${SECRET_HOST:-}}"
+          HOSTNAME_VALUE="${INPUT_HOSTNAME:-${SECRET_HOSTNAME:-}}"
+
+          KEY=""
+          VALUE=""
+          SUMMARY="off"
+
+          case "$MODE" in
+            smart)
+              KEY="mode"; VALUE="smart"; SUMMARY="smart"
+              ;;
+            region)
+              if ! echo "$REGION" | grep -Eq '^[A-Za-z0-9_-]+$'; then
+                echo "::error::placement_mode is 'region' but the region is empty or invalid ('$REGION')."
+                exit 1
+              fi
+              KEY="region"; VALUE="${PROVIDER}:${REGION}"; SUMMARY="region (${VALUE})"
+              ;;
+            host)
+              if ! echo "$HOST_VALUE" | grep -Eq '^[A-Za-z0-9.-]+:[0-9]{1,5}$'; then
+                echo "::error::placement_mode is 'host' but the value is empty or not host:port ('$HOST_VALUE')."
+                exit 1
+              fi
+              KEY="host"; VALUE="$HOST_VALUE"; SUMMARY="host (${VALUE})"
+              ;;
+            hostname)
+              if ! echo "$HOSTNAME_VALUE" | grep -Eq '^[A-Za-z0-9.-]+$'; then
+                echo "::error::placement_mode is 'hostname' but the value is empty or invalid ('$HOSTNAME_VALUE')."
+                exit 1
+              fi
+              KEY="hostname"; VALUE="$HOSTNAME_VALUE"; SUMMARY="hostname (${VALUE})"
+              ;;
+          esac
+
+          {
+            echo "key=$KEY"
+            echo "value=$VALUE"
+            echo "summary=$SUMMARY"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Apply worker name and placement to wrangler.toml
+        env:
+          WORKER_NAME: ${{ steps.worker.outputs.name }}
+          PLACEMENT_KEY: ${{ steps.placementval.outputs.key }}
+          PLACEMENT_VALUE: ${{ steps.placementval.outputs.value }}
+        run: |
+          set -euo pipefail
+          sed -i "s/^name = .*/name = \"${WORKER_NAME}\"/" wrangler.toml
+          sed -i "s/^service = .*/service = \"${WORKER_NAME}\"/" wrangler.toml
+
+          if [ -n "$PLACEMENT_KEY" ]; then
+            awk '
+              /^\[placement\][[:space:]]*$/ { skip = 1; next }
+              /^\[/ { skip = 0 }
+              !skip { print }
+            ' wrangler.toml > wrangler.toml.tmp
+            mv wrangler.toml.tmp wrangler.toml
+            {
+              echo ""
+              echo "[placement]"
+              echo "${PLACEMENT_KEY} = \"${PLACEMENT_VALUE}\""
+            } >> wrangler.toml
+          fi
+
+          echo "---- wrangler.toml ----"
+          cat wrangler.toml
+
+      - name: Deploy via Wrangler (${{ steps.worker.outputs.name }} → ${{ steps.account.outputs.label }})
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ matrix.index == 1 && secrets.CLOUDFLARE_API_TOKEN || secrets[format('CLOUDFLARE_API_TOKEN_{0}', matrix.index)] }}
+          accountId: ${{ matrix.index == 1 && secrets.CLOUDFLARE_ACCOUNT_ID || secrets[format('CLOUDFLARE_ACCOUNT_ID_{0}', matrix.index)] }}
+
+      - name: Deployment summary
+        env:
+          CF_API_TOKEN: ${{ matrix.index == 1 && secrets.CLOUDFLARE_API_TOKEN || secrets[format('CLOUDFLARE_API_TOKEN_{0}', matrix.index)] }}
+          CF_ACCOUNT_ID: ${{ matrix.index == 1 && secrets.CLOUDFLARE_ACCOUNT_ID || secrets[format('CLOUDFLARE_ACCOUNT_ID_{0}', matrix.index)] }}
+          WORKER_NAME: ${{ steps.worker.outputs.name }}
+          ACCOUNT_LABEL: ${{ steps.account.outputs.label }}
+          PLACEMENT_SUMMARY: ${{ steps.placementval.outputs.summary }}
+          INDEX: ${{ matrix.index }}
+        run: |
           set +x
+          HOST=""
           resp=$(curl -s -X GET \
             "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/workers/subdomain" \
             -H "Authorization: Bearer ${CF_API_TOKEN}" \
-            -H "Content-Type: application/json")
-          ok=$(echo "$resp" | jq -r '.success')
-          if [ "$ok" != "true" ]; then
-            echo "Deployed as: ${WORKER_NAME}"
-            exit 0
-          fi
-          SUBDOMAIN=$(echo "$resp" | jq -r '.result.subdomain')
-          if [ -z "$SUBDOMAIN" ] || [ "$SUBDOMAIN" = "null" ]; then
-            echo "Deployed as: ${WORKER_NAME}"
-            exit 0
-          fi
-          echo "URL: https://${WORKER_NAME}.${SUBDOMAIN}.workers.dev"
-
-  account-2:
-    name: Deploy - Account 2
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_account_2 == true }}
-    runs-on: ubuntu-latest
-    env:
-      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_2 }}
-      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID_2 }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - run: |
-          echo "::add-mask::${CF_API_TOKEN}"
-          echo "::add-mask::${CF_ACCOUNT_ID}"
-
-      - id: name
-        run: |
-          set -euo pipefail
-          INPUT_NAME="${{ inputs.worker_name }}"
-          TOML_NAME=$(grep '^name' wrangler.toml | head -1 | sed -E 's/name\s*=\s*"(.*)"/\1/')
-          if [ -n "$INPUT_NAME" ]; then
-            FINAL_NAME="$INPUT_NAME"
+            -H "Content-Type: application/json" || true)
+          SUBDOMAIN=$(echo "$resp" | jq -r 'if .success == true then .result.subdomain else "" end' 2>/dev/null || true)
+          if [ -n "$SUBDOMAIN" ] && [ "$SUBDOMAIN" != "null" ]; then
+            HOST="${WORKER_NAME}.${SUBDOMAIN}.workers.dev"
+            echo "URL: https://${HOST}"
           else
-            FINAL_NAME="$TOML_NAME"
-          fi
-          echo "worker_name=$FINAL_NAME" >> "$GITHUB_OUTPUT"
-
-      - run: |
-          sed -i "s/^name = .*/name = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
-          sed -i "s/^service = .*/service = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
-
-      - uses: cloudflare/wrangler-action@v7
-        with:
-          apiToken: ${{ env.CF_API_TOKEN }}
-          accountId: ${{ env.CF_ACCOUNT_ID }}
-
-      - env:
-          WORKER_NAME: ${{ steps.name.outputs.worker_name }}
-        run: |
-          set -euo pipefail
-          set +x
-          resp=$(curl -s -X GET \
-            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/workers/subdomain" \
-            -H "Authorization: Bearer ${CF_API_TOKEN}" \
-            -H "Content-Type: application/json")
-          ok=$(echo "$resp" | jq -r '.success')
-          if [ "$ok" != "true" ]; then
             echo "Deployed as: ${WORKER_NAME}"
-            exit 0
           fi
-          SUBDOMAIN=$(echo "$resp" | jq -r '.result.subdomain')
-          if [ -z "$SUBDOMAIN" ] || [ "$SUBDOMAIN" = "null" ]; then
-            echo "Deployed as: ${WORKER_NAME}"
-            exit 0
-          fi
-          echo "URL: https://${WORKER_NAME}.${SUBDOMAIN}.workers.dev"
 
-  account-3:
-    name: Deploy - Account 3
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_account_3 == true }}
-    runs-on: ubuntu-latest
-    env:
-      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_3 }}
-      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID_3 }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - run: |
-          echo "::add-mask::${CF_API_TOKEN}"
-          echo "::add-mask::${CF_ACCOUNT_ID}"
-
-      - id: name
-        run: |
-          set -euo pipefail
-          INPUT_NAME="${{ inputs.worker_name }}"
-          TOML_NAME=$(grep '^name' wrangler.toml | head -1 | sed -E 's/name\s*=\s*"(.*)"/\1/')
-          if [ -n "$INPUT_NAME" ]; then
-            FINAL_NAME="$INPUT_NAME"
-          else
-            FINAL_NAME="$TOML_NAME"
-          fi
-          echo "worker_name=$FINAL_NAME" >> "$GITHUB_OUTPUT"
-
-      - run: |
-          sed -i "s/^name = .*/name = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
-          sed -i "s/^service = .*/service = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
-
-      - uses: cloudflare/wrangler-action@v7
-        with:
-          apiToken: ${{ env.CF_API_TOKEN }}
-          accountId: ${{ env.CF_ACCOUNT_ID }}
-
-      - env:
-          WORKER_NAME: ${{ steps.name.outputs.worker_name }}
-        run: |
-          set -euo pipefail
-          set +x
-          resp=$(curl -s -X GET \
-            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/workers/subdomain" \
-            -H "Authorization: Bearer ${CF_API_TOKEN}" \
-            -H "Content-Type: application/json")
-          ok=$(echo "$resp" | jq -r '.success')
-          if [ "$ok" != "true" ]; then
-            echo "Deployed as: ${WORKER_NAME}"
-            exit 0
-          fi
-          SUBDOMAIN=$(echo "$resp" | jq -r '.result.subdomain')
-          if [ -z "$SUBDOMAIN" ] || [ "$SUBDOMAIN" = "null" ]; then
-            echo "Deployed as: ${WORKER_NAME}"
-            exit 0
-          fi
-          echo "URL: https://${WORKER_NAME}.${SUBDOMAIN}.workers.dev"
-
-  account-4:
-    name: Deploy - Account 4
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_account_4 == true }}
-    runs-on: ubuntu-latest
-    env:
-      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_4 }}
-      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID_4 }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - run: |
-          echo "::add-mask::${CF_API_TOKEN}"
-          echo "::add-mask::${CF_ACCOUNT_ID}"
-
-      - id: name
-        run: |
-          set -euo pipefail
-          INPUT_NAME="${{ inputs.worker_name }}"
-          TOML_NAME=$(grep '^name' wrangler.toml | head -1 | sed -E 's/name\s*=\s*"(.*)"/\1/')
-          if [ -n "$INPUT_NAME" ]; then
-            FINAL_NAME="$INPUT_NAME"
-          else
-            FINAL_NAME="$TOML_NAME"
-          fi
-          echo "worker_name=$FINAL_NAME" >> "$GITHUB_OUTPUT"
-
-      - run: |
-          sed -i "s/^name = .*/name = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
-          sed -i "s/^service = .*/service = \"${{ steps.name.outputs.worker_name }}\"/" wrangler.toml
-
-      - uses: cloudflare/wrangler-action@v7
-        with:
-          apiToken: ${{ env.CF_API_TOKEN }}
-          accountId: ${{ env.CF_ACCOUNT_ID }}
-
-      - env:
-          WORKER_NAME: ${{ steps.name.outputs.worker_name }}
-        run: |
-          set -euo pipefail
-          set +x
-          resp=$(curl -s -X GET \
-            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/workers/subdomain" \
-            -H "Authorization: Bearer ${CF_API_TOKEN}" \
-            -H "Content-Type: application/json")
-          ok=$(echo "$resp" | jq -r '.success')
-          if [ "$ok" != "true" ]; then
-            echo "Deployed as: ${WORKER_NAME}"
-            exit 0
-          fi
-          SUBDOMAIN=$(echo "$resp" | jq -r '.result.subdomain')
-          if [ -z "$SUBDOMAIN" ] || [ "$SUBDOMAIN" = "null" ]; then
-            echo "Deployed as: ${WORKER_NAME}"
-            exit 0
-          fi
-          echo "URL: https://${WORKER_NAME}.${SUBDOMAIN}.workers.dev"
+          {
+            echo "## Deployment Successful — ${ACCOUNT_LABEL}"
+            echo ""
+            echo "| Property | Value |"
+            echo "|:-----|:-----|"
+            echo "| **Account** | ${ACCOUNT_LABEL} (slot ${INDEX}) |"
+            echo "| **Worker** | \`${WORKER_NAME}\` |"
+            echo "| **Placement** | \`${PLACEMENT_SUMMARY}\` |"
+            if [ -n "$HOST" ]; then
+              echo "| **URL** | https://${HOST} |"
+              echo "| **RISK_API_HOST entry** | \`${HOST}\` |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
