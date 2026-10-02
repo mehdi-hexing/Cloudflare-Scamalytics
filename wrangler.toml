@@ -1,4 +1,5 @@
 name = "cloudflare-scamalytics"
+main = "worker.js"
 compatibility_date = "2026-10-02"
 
 [[services]]
