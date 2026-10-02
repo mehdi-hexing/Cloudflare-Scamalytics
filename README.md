@@ -17,9 +17,10 @@ one that matches your platform, you don't need both:
 - **`worker.js`** - for a plain Cloudflare Worker. Includes fixes for two
   platform restrictions that only affect Workers on `*.workers.dev` (not
   Pages) - see [Platform differences](#platform-differences-worker-vs-pages).
-- **`_worker.js`** - for Cloudflare Pages. Left exactly as the original,
-  unmodified source, since Pages doesn't hit either restriction and the
-  file already worked correctly as-is.
+- **`_worker.js`** - for Cloudflare Pages. Doesn't need the platform fixes
+  above (Pages doesn't hit either restriction), but it carries the exact
+  same risk-scoring logic as `worker.js` - see
+  [Risk scoring](#risk-scoring-sources-validation-and-na).
 
 ### As a Worker (recommended - `wrangler.toml` included)
 
@@ -124,8 +125,11 @@ GET /api/<ip>
 GET /?ip=<ip>
 ```
 
-Returns fraud score and details for one IP. Unchanged, safe for existing
-integrations.
+Returns fraud score and details for one IP. The existing fields are
+unchanged; `info` also carries `risk_source` (which upstream answered) and
+`risk_diagnostics` (what every source that was tried returned). When no
+source can produce a real Fraud Score the response is `"error": true` with
+HTTP 500 and a `risk_diagnostics` object - it is never a fake score of 0.
 
 ### Domain - full risk check
 
@@ -213,9 +217,9 @@ IPv4 and IPv6 are treated as first-class, everywhere:
 
 ## Notes
 
-- Scoring scrapes scamalytics.com with public proxies as fallback, so it can
-  get rate-limited or blocked; that shows up as `"error": true` on individual
-  IPs.
+- Scoring scrapes scamalytics.com, trying the sources listed in
+  `RISK_SOURCES` one by one, so it can get rate-limited or blocked; that
+  shows up as `"error": true` on individual IPs (treat those as N/A).
 - Domain scoring is throttled (small batches, staggered requests, one retry)
   to reduce blocking, so large domains take longer to fully score.
 - Check-Host results are proxied from a separate API
@@ -224,6 +228,51 @@ IPv4 and IPv6 are treated as first-class, everywhere:
   country+host+type for 60 seconds. If that API is slow or down, the
   affected country's card shows an error message instead of results for
   other countries in the same request.
+
+## Risk scoring: sources, validation and N/A
+
+The scoring code is identical in `worker.js` and `_worker.js`.
+
+- **A score is only valid if it was really parsed.** A response is accepted
+  only when a Fraud Score between 0 and 100 can be extracted from it. A page
+  that merely mentions "scamalytics" (captcha, rate-limit or proxy error
+  page) is rejected. The parser throws instead of defaulting to `0`, so a
+  failed parse can no longer show up as `very_low` risk.
+- **N/A instead of 0.** If no source produces a valid score, the API answers
+  `"error": true` (HTTP 500) and clients should show **N/A**. Domain/batch
+  results mark that IP with `"error": true` and keep going.
+- **Sources are tried in order, not raced.** Each IP costs one outbound
+  request in the normal case; the next source is only called when the
+  previous one failed. No more 4-6 parallel requests per IP.
+- **Switching sources on/off.** `RISK_SOURCES` (right above
+  `fetchScamalyticsData`) is the list of sources. Comment a line out and
+  that source is never called, so it adds no load; uncomment it to enable
+  it again. Shipped state: `Direct`, `AllOrigins` and `Codetabs` enabled;
+  `CorsProxyIO`, `ThingProxy` and `JSONP` commented out (they returned only
+  HTTP errors / timeouts in the last diagnostics run).
+- **Safe fallbacks.** The JSON-style fallbacks (`"score": N`, `"risk": "..."`)
+  are only used when the page itself is Scamalytics, so an unrelated JSON
+  body can't pass as a score. Risk labels are matched most-specific first
+  (`Very High Risk` is never read as `High Risk`).
+- **Timeouts cover the body.** The per-source timer stays active until the
+  response body has been fully read, so a response that sends headers and
+  then stalls is aborted and reported as `TIMEOUT` instead of hanging.
+- **Circuit breaker.** A source that fails 8 times in a row is skipped for
+  2 minutes (`BREAKER_FAILURE_THRESHOLD`, `BREAKER_COOLDOWN_MS`) and reported
+  as `SKIPPED circuit open`. After the cooldown one request probes it again.
+  If every source is open at once, breakers are ignored for that request so
+  the Worker can recover by itself. State is per Worker isolate.
+- **Worst case per IP.** With the shipped sources, one IP whose sources all
+  fail takes at most about 11 s (Direct up to 3 s, then 4 s each for
+  AllOrigins and Codetabs), then the 45 s negative cache stops repeats.
+- **Telemetry.** Every successful response has `info.risk_source` and
+  `info.risk_diagnostics`, e.g.
+  `{"Direct":"HTTP 403","AllOrigins":"INVALID Fraud score not found","Codetabs":"SUCCESS"}`.
+  Failure values are `TIMEOUT`, `HTTP <status>`, `INVALID <reason>`,
+  `ERROR <reason>` or `SKIPPED circuit open`. Failed responses carry the same object at the top level.
+  Answers served from the edge cache report `{"Cache":"HIT"}` so clients
+  don't count upstream attempts twice; a recent total failure (45 s
+  negative cache) reports `{"Cache":"NEGATIVE_CACHE"}`.
 
 ## Platform differences: Worker vs Pages
 

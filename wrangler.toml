@@ -1,7 +1,9 @@
 name = "cloudflare-scamalytics"
-main = "worker.js"
-compatibility_date = "2024-09-23"
+compatibility_date = "2026-10-02"
 
 [[services]]
 binding = "SELF"
 service = "cloudflare-scamalytics"
+
+[observability.logs]
+enabled = false
